@@ -81,8 +81,10 @@ pythonw pet.py
 
 `hook.py` 不輸出任何東西、永遠以 0 結束，出錯也不會影響 Claude Code。
 
-> 目前狀態：寵物本體與 `hook.py` 已用手動模擬事件測試過；
-> 在實際的 Claude Code（特別是 VS Code 擴充功能）裡由 hooks 驅動的流程，還沒有完整驗證。
+> 已驗證：在 VS Code 擴充功能版的 Claude Code 裡，`PreToolUse` / `PostToolUse` 會正常觸發，
+> 寵物會跟著做出敲鍵盤、思考等動作。其餘事件（`UserPromptSubmit`、`Stop`、`Notification`、
+> `PostToolUseFailure`、`SessionStart`）設定方式相同，但各自的實際表現請自行留意。
+> 若 hooks 沒有生效，先確認 `settings.json` 的路徑正確，並重新開啟對話。
 
 ## 設定（`config.json`）
 
