@@ -338,7 +338,48 @@ USERBG = "#f4dccf"
 CODEBG = "#efe4d6"
 OKC, WARNC, BADC = "#5aa469", "#e0a43a", "#d0453f"
 UIFONT = ("Microsoft JhengHei UI", 10)
+INPUTFONT = ("Microsoft JhengHei UI", 11)
 CODEFONT = ("Consolas", 10)
+
+
+def set_ime_font(widget, family="Microsoft JhengHei UI", px=15):
+    """Tk 在 Windows 上不會替輸入法的組字（注音、拼音選字中的那串字）指定字型，
+    系統會拿預設的細明體／宋體來畫，所以輸入中的字會長得很怪。這裡替它指定跟輸入框一樣的字型。"""
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class LOGFONTW(ctypes.Structure):
+            _fields_ = [("lfHeight", wintypes.LONG), ("lfWidth", wintypes.LONG), ("lfEscapement", wintypes.LONG),
+                        ("lfOrientation", wintypes.LONG), ("lfWeight", wintypes.LONG), ("lfItalic", wintypes.BYTE),
+                        ("lfUnderline", wintypes.BYTE), ("lfStrikeOut", wintypes.BYTE), ("lfCharSet", wintypes.BYTE),
+                        ("lfOutPrecision", wintypes.BYTE), ("lfClipPrecision", wintypes.BYTE), ("lfQuality", wintypes.BYTE),
+                        ("lfPitchAndFamily", wintypes.BYTE), ("lfFaceName", wintypes.WCHAR * 32)]
+
+        imm = ctypes.windll.imm32
+        imm.ImmGetContext.restype = wintypes.HANDLE
+        imm.ImmGetContext.argtypes = [wintypes.HWND]
+        imm.ImmSetCompositionFontW.argtypes = [wintypes.HANDLE, ctypes.POINTER(LOGFONTW)]
+        imm.ImmReleaseContext.argtypes = [wintypes.HWND, wintypes.HANDLE]
+        lf = LOGFONTW()
+        lf.lfHeight, lf.lfWeight, lf.lfCharSet, lf.lfQuality, lf.lfFaceName = -px, 400, 1, 5, family  # 5 = CLEARTYPE_QUALITY
+
+        def apply(_e=None):
+            try:
+                hwnd = widget.winfo_id()
+                himc = imm.ImmGetContext(hwnd)
+                if himc:
+                    imm.ImmSetCompositionFontW(himc, ctypes.byref(lf))
+                    imm.ImmReleaseContext(hwnd, himc)
+            except Exception:
+                pass
+
+        widget.bind("<FocusIn>", apply, add="+")
+        widget.bind("<KeyPress>", apply, add="+")
+    except Exception:
+        pass
 BAR_W = 140
 
 
@@ -457,7 +498,7 @@ class ChatWindow:
 
         # 對話內容
         self.msg_frame = tk.Frame(c, bg=paper)
-        self.text = tk.Text(self.msg_frame, wrap="word", font=UIFONT, bg=paper, fg=INKC, relief="flat", padx=10, pady=6,
+        self.text = tk.Text(self.msg_frame, wrap="word", font=INPUTFONT, bg=paper, fg=INKC, relief="flat", padx=10, pady=6,
                             state="disabled", cursor="arrow", spacing1=2, spacing3=2, insertbackground=INKC,
                             selectbackground="#f0c9b8", highlightthickness=0, bd=0)
         self.scroll = Scroll(self.msg_frame, self.text.yview, PAPER)
@@ -465,13 +506,14 @@ class ChatWindow:
         self.scroll.pack(side="right", fill="y", padx=(0, 3), pady=6)
         self.text.pack(side="left", fill="both", expand=True)
         self.i_msg = c.create_window(0, 0, anchor="nw", window=self.msg_frame)
+        self._watch_scroll()
         txt = self.text
         txt.tag_config("who_user", foreground=ACCENT, font=("Microsoft JhengHei UI", 9, "bold"), spacing1=10, justify="right", rmargin=4)
         txt.tag_config("user", background=USERBG, lmargin1=28, lmargin2=28, rmargin=4, spacing1=3, spacing3=3)
         txt.tag_config("who_bot", foreground="#4a7bd0", font=("Microsoft JhengHei UI", 9, "bold"), spacing1=10)
         txt.tag_config("bot", lmargin1=4, lmargin2=4)
         txt.tag_config("code", font=CODEFONT, background=CODEBG)
-        txt.tag_config("bold", font=("Microsoft JhengHei UI", 10, "bold"))
+        txt.tag_config("bold", font=("Microsoft JhengHei UI", 11, "bold"))
         txt.tag_config("note", foreground=DIM, font=("Microsoft JhengHei UI", 9), lmargin1=8, lmargin2=8)
         txt.tag_config("err", foreground=BADC, font=("Microsoft JhengHei UI", 9), lmargin1=8, lmargin2=8)
         self.face = photo(render_face(kit), PAPER)
@@ -496,8 +538,9 @@ class ChatWindow:
         self.i_card = c.create_window(0, 0, anchor="nw", window=self.card, state="hidden")
 
         # 輸入
-        self.input = tk.Text(c, wrap="word", font=UIFONT, bg="white", fg=INKC, relief="flat", padx=4, pady=2, bd=0,
+        self.input = tk.Text(c, wrap="word", font=INPUTFONT, bg="white", fg=INKC, relief="flat", padx=4, pady=2, bd=0,
                              insertbackground=INKC, highlightthickness=0, selectbackground="#f0c9b8")
+        set_ime_font(self.input)
         self.i_input = c.create_window(0, 0, anchor="nw", window=self.input)
         self.send_btn = Pill(c, kit, t("chat.send"), 38, CREAM, ACCENT_P, ACCENT_HOVER, (255, 255, 255, 255), self.on_send, px=12.5, min_w=62)
         self.i_send = c.create_window(0, 0, anchor="nw", window=self.send_btn)
@@ -738,19 +781,37 @@ class ChatWindow:
         self.request_layout()
 
     # —— 對話內容 ——
-    def _at_bottom(self):
-        return self.text.yview()[1] > 0.97
+    # 「跟著捲到底」只由使用者自己捲動來決定。不能在每次寫入前才去量 yview：
+    # Tk 排版是延後算的，連續寫入時量到的是過期的數字，會誤判成「使用者往上捲了」而停止跟隨。
+    def _watch_scroll(self):
+        self.follow = True
+        self._scroll_job = None
+        for w, seqs in ((self.text, ("<MouseWheel>", "<Key>", "<ButtonRelease-1>")), (self.scroll, ("<ButtonRelease-1>", "<B1-Motion>"))):
+            for seq in seqs:
+                w.bind(seq, lambda e: self.win.after(30, self._sync_follow), add="+")
+
+    def _sync_follow(self):
+        self.follow = self.text.yview()[1] > 0.995
+
+    def _scroll_to_end(self):
+        if self._scroll_job is None:  # 同一輪內多次寫入只捲一次，等排版算完再捲才會真的到底
+            self._scroll_job = self.win.after_idle(self._do_scroll_end)
+
+    def _do_scroll_end(self):
+        self._scroll_job = None
+        if self.follow:
+            self.text.yview_moveto(1.0)
 
     def _insert(self, s, *tags):
-        stick = self._at_bottom()
         self.text.config(state="normal")
         self.text.insert("end", s, tags)
         self.text.config(state="disabled")
-        if stick:
-            self.text.see("end")
+        if self.follow:
+            self._scroll_to_end()
 
     def add_user(self, s):
         self.close_assistant()
+        self.follow = True  # 自己送出訊息一定回到最底
         self._insert(t("chat.you") + "\n", "who_user")
         self._insert(s + "\n", "user")
 
@@ -774,7 +835,6 @@ class ChatWindow:
         if not self.assistant_open:
             return
         self.assistant_open = False
-        stick = self._at_bottom()
         self.text.config(state="normal")
         raw = self.text.get("msg_start", "end-1c")
         self.text.delete("msg_start", "end-1c")
@@ -782,8 +842,8 @@ class ChatWindow:
             self.text.insert("end", piece, ("bot",) if kind == "text" else (kind,))
         self.text.insert("end", "\n", "bot")
         self.text.config(state="disabled")
-        if stick:
-            self.text.see("end")
+        if self.follow:
+            self._scroll_to_end()
 
     def add_note(self, s, tag="note"):
         self.close_assistant()
