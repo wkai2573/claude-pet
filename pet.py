@@ -975,7 +975,22 @@ def make_ui_sheet(path):
     sheet.save(path)
 
 
+def make_icon(path):
+    """用平常的小克做一個 .ico（捷徑圖示用）：裁到角色邊界、補成正方形、多種尺寸。"""
+    im = render("idle", 3, 0, 1.0)
+    box = im.getchannel("A").point(lambda v: 255 if v >= 100 else 0).getbbox()
+    im = im.crop(box)
+    side = max(im.size) + 16
+    canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    canvas.alpha_composite(im, ((side - im.width) // 2, (side - im.height) // 2))
+    canvas = canvas.resize((256, 256), Image.LANCZOS)
+    canvas.save(path, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+
+
 def main():
+    if len(sys.argv) >= 3 and sys.argv[1] == "--icon":
+        make_icon(sys.argv[2])
+        return
     if len(sys.argv) >= 3 and sys.argv[1] == "--sheet":
         make_sheet(sys.argv[2])
         return

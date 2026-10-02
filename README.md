@@ -44,6 +44,29 @@ pythonw pet.py
 
 用 `pythonw` 才不會多出一個黑色主控台視窗。同一時間只會有一隻：再執行一次會直接結束。
 
+### 桌面捷徑
+
+建立一個指向 `pythonw.exe` 的捷徑即可：
+
+- 目標：`<pythonw.exe 的路徑>`
+- 參數：`"<專案路徑>\pet.py"`
+- 起始位置：`<專案路徑>`
+- 圖示：`<專案路徑>\assets\icon.ico`
+
+也可以用 PowerShell 建立（把三個路徑換成你的）：
+
+```powershell
+$proj = "C:\path\to\claude-pet"
+$sh = New-Object -ComObject WScript.Shell
+$lnk = $sh.CreateShortcut([Environment]::GetFolderPath("Desktop") + "\Claude 小克.lnk")
+$lnk.TargetPath = "C:\path\to\pythonw.exe"
+$lnk.Arguments = "`"$proj\pet.py`""
+$lnk.WorkingDirectory = $proj
+$lnk.IconLocation = "$proj\assets\icon.ico,0"
+$lnk.WindowStyle = 7
+$lnk.Save()
+```
+
 ### 接上 Claude Code（讓它跟著 Claude 動）
 
 寵物靠 Claude Code 的 hooks（官方文件有說明）取得狀態。
@@ -103,6 +126,7 @@ pythonw pet.py
 ```powershell
 python pet.py --sheet sheet.png      # 所有動作的影格排成一張圖
 python pet.py --ui-sheet ui.png      # 對話泡泡與右鍵選單（深色與淺色背景）
+python pet.py --icon assets/icon.ico # 重新產生捷徑用的圖示
 ```
 
 ### 檔案
