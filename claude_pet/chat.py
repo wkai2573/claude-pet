@@ -38,6 +38,7 @@ MODELS = [
     ("Sonnet 5.5", "claude-sonnet-5-5"),
     ("Haiku 4.5", "claude-haiku-4-5-20251001"),
 ]
+EFFORTS = [None, "low", "medium", "high", "xhigh", "max"]  # claude --effort 的等級；None = 不指定，用模型自己的預設
 QUOTA_MODEL = "claude-haiku-4-5-20251001"
 NO_WINDOW = 0x08000000  # CREATE_NO_WINDOW：從 pythonw 啟動時不要閃出黑色主控台
 CHILD_ENV = "CLAUDE_PET_CHILD"  # 設了這個，hook.py 就不處理（對話的動作由這裡直接驅動）
@@ -51,6 +52,16 @@ def model_short(value):
         if v == value:
             return label
     return value
+
+
+def effort_label(value):
+    """選單裡用的名稱。"""
+    return t("effort.default" if value is None else "effort." + value)
+
+
+def effort_short(value):
+    """按鈕上用的短名稱（超高 / XHigh 這種長的另外縮短）。"""
+    return t("effort.short.xhigh") if value == "xhigh" else effort_label(value)
 
 
 def model_label(value):
@@ -176,8 +187,8 @@ def probe_quota(claude, out, token):
 class Session:
     """一個 `claude` 子行程；可以連續多輪對話。所有事件放進共用佇列：(session, 種類, 內容)。"""
 
-    def __init__(self, claude, cwd, model, out):
-        self.claude, self.cwd, self.model, self.out = claude, cwd, model, out
+    def __init__(self, claude, cwd, model, out, effort=None):
+        self.claude, self.cwd, self.model, self.out, self.effort = claude, cwd, model, out, effort
         self.proc = None
         self.streamed = False  # 目前這則訊息的文字是否已經用串流方式送過了
         self.stderr_tail = deque(maxlen=12)
@@ -191,6 +202,8 @@ class Session:
                "--include-partial-messages", "--permission-prompt-tool", "stdio"]
         if self.model:
             cmd += ["--model", self.model]
+        if self.effort:
+            cmd += ["--effort", self.effort]
         env = dict(os.environ, **{CHILD_ENV: "1"})
         self.proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.cwd, env=env,
@@ -222,6 +235,15 @@ class Session:
         if model:
             req["model"] = model
         self._write({"type": "control_request", "request_id": f"pet_{time.time_ns()}", "request": req})
+
+    def set_effort(self, level):
+        """對話中途換思考強度。回傳這一輪有沒有立刻生效：max 只有啟動時用 --effort 才收，中途改不了。"""
+        self.effort = level
+        if level == "max":
+            return False
+        self._write({"type": "control_request", "request_id": f"pet_{time.time_ns()}",
+                     "request": {"subtype": "apply_flag_settings", "settings": {"effortLevel": level}}})
+        return True
 
     def interrupt(self):
         self._write({"type": "control_request", "request_id": f"pet_{time.time_ns()}", "request": {"subtype": "interrupt"}})
@@ -491,6 +513,9 @@ class ChatWindow:
                 c.itemconfigure(item, width=w, height=h)
 
         put(self.i_close, R - self.close_btn.w + 2, 4 + (TITLE_H - 24) // 2 - 1)
+        text = self.dir_text()  # 視窗被拉窄、拉寬時，資料夾名字跟著重新截
+        if text != self.dir_chip.text:
+            self.dir_chip.set_text(text)
         cy = 4 + TITLE_H + 8
         put(self.i_model, L, cy)
         put(self.i_dir, L + self.model_chip.w + 6, cy)
@@ -610,10 +635,7 @@ class ChatWindow:
             self.relayout()  # 補畫完整品質的底圖
 
     def open_model_menu(self):
-        items = []
-        for _, value in MODELS:
-            on = value == self.chat.model
-            items.append(dict(icon="✅" if on else "⚪", label=model_short(value), cb=lambda v=value: self.chat.choose_model(v)))
+        items = self.chat.model_effort_items()
         x = self.win.winfo_rootx() + self.model_chip.winfo_x()
         y = self.win.winfo_rooty() + self.model_chip.winfo_y() + 28
         pet = self.chat.pet
@@ -640,10 +662,23 @@ class ChatWindow:
 
     # —— 標頭與配額 ——
     def refresh_header(self):
-        self.model_chip.set_text(model_short(self.chat.model))
-        name = Path(self.chat.cwd).name or self.chat.cwd
-        self.dir_chip.set_text(t("chat.folder", name=name if len(name) <= 14 else name[:13] + "…"))
+        chip = model_short(self.chat.model)
+        if self.chat.effort:
+            chip += " · " + effort_short(self.chat.effort)
+        self.model_chip.set_text(chip)
+        self.dir_chip.set_text(self.dir_text())
         self.request_layout()
+
+    def dir_text(self):
+        """資料夾按鈕的字：名字太長就截短，讓三顆按鈕在目前的視窗寬度放得下。"""
+        name = Path(self.chat.cwd).name or self.chat.cwd
+        budget = (self.W - SHM - PAD) - (4 + PAD) - self.model_chip.w - self.new_chip.w - 12
+        full = t("chat.folder", name=name)
+        n = len(name)
+        while n > 3 and self.dir_chip.width_for(full) > budget:
+            n -= 1
+            full = t("chat.folder", name=name[:n] + "…")
+        return full
 
     def refresh_quota_bars(self):
         self.request_layout()
@@ -808,6 +843,7 @@ class Chat:
         self.probing = False
         self.cfg = pet.cfg
         self.model = self.cfg.get("chat_model")
+        self.effort = self.cfg.get("chat_effort") if self.cfg.get("chat_effort") in EFFORTS else None
         self.cwd = self.cfg.get("chat_cwd") or str(Path.home())
         if not Path(self.cwd).is_dir():
             self.cwd = str(Path.home())
@@ -835,6 +871,33 @@ class Chat:
             self.window.refresh_header()
             self.window.add_note(t("note.model_switched", model=model_short(value)))
         self.pet.say(t("bubble.switched", model=model_short(value)))
+
+    def model_items(self):
+        return [dict(icon="✅" if v == self.model else "⚪", label=model_short(v), cb=lambda v=v: self.choose_model(v))
+                for _, v in MODELS]
+
+    def effort_items(self):
+        return [dict(icon="✅" if v == self.effort else "⚪", label=effort_label(v), cb=lambda v=v: self.choose_effort(v))
+                for v in EFFORTS]
+
+    def model_effort_items(self):
+        """對話視窗裡模型按鈕點開的選單；右鍵選單也用同樣的兩個子選單。"""
+        return [dict(icon="🧠", label=t("menu.model"), hint=model_short(self.model), children=self.model_items()),
+                dict(icon="⚡", label=t("menu.effort"), hint=effort_short(self.effort), children=self.effort_items())]
+
+    def choose_effort(self, value):
+        self.effort = value
+        self.cfg["chat_effort"] = value
+        self.pet.save_cfg()
+        applied = True
+        if self.session and self.session.alive():
+            applied = self.session.set_effort(value)
+        if self.window:
+            self.window.refresh_header()
+            self.window.add_note(t("note.effort_switched", effort=effort_label(value)))
+            if not applied:
+                self.window.add_note(t("note.effort_max"))
+        self.pet.say(t("bubble.effort", effort=effort_label(value)))
 
     def cycle_model(self):
         values = [v for _, v in MODELS]
@@ -923,7 +986,7 @@ class Chat:
             return
         if not (self.session and self.session.alive()):
             self.drop_session()
-            self.session = Session(claude, self.cwd, self.model, self.out)
+            self.session = Session(claude, self.cwd, self.model, self.out, self.effort)
             try:
                 self.session.start()
             except OSError as e:

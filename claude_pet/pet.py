@@ -1061,6 +1061,7 @@ class Pet:
             dict(icon="💬", label=t("menu.chat"), cb=c.open),
             dict(icon="📊", label=t("menu.quota"), cb=c.show_quota),
             dict(icon="🧠", label=t("menu.model"), hint=chat.model_short(c.model), children=models),
+            dict(icon="⚡", label=t("menu.effort"), hint=chat.effort_short(c.effort), children=c.effort_items()),
             dict(section=t("section.pet")),
             dict(icon="🎭", label=t("menu.actions"), children=actions),
             dict(icon="⚙️", label=t("menu.settings"), cb=self.open_settings),
