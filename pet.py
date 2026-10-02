@@ -21,6 +21,9 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageTk
 
 import chat
+import i18n
+import settings
+from i18n import t
 
 HERE = Path(__file__).resolve().parent
 STATE = HERE / "state.json"
@@ -55,13 +58,9 @@ ZCOL = (225, 236, 255, 255)
 
 SEARCH_TOOLS = {"Read", "Grep", "Glob", "WebSearch", "WebFetch", "LS", "NotebookRead"}
 
-BUBBLES = {
-    "happy": ["做好了！", "搞定～", "好耶～", "任務達成"],
-    "attention": ["需要你看一下！", "換你了～", "等你回覆喔"],
-    "error": ["哎呀…", "暈了暈了…"],
-    "petted": ["嘿嘿～", "好舒服", "再摸一下嘛", "癢癢的～"],
-    "wake": ["嗯？"],
-}
+def phrase(kind):
+    """某種情緒的一句話（依語言，從清單裡隨機挑）。"""
+    return random.choice(t("bubble." + kind))
 
 
 # ───────────────────────── 畫筆 ─────────────────────────
@@ -625,17 +624,17 @@ def render_bubble(text, kind, age, life):
     return img
 
 
-MENU_W, ROW_H, HEAD_H = 156, 27, 29
-SEC_H, SEP_H, SUB_ROW_H = 22, 9, 24  # 分類小標題、分隔線、子項目的高度
+MENU_W, ROW_H, HEAD_H = 168, 27, 29
+SEC_H, SEP_H, TOP_PAD = 22, 9, 6  # 分類小標題、分隔線的高度；沒有標題列的子選單頂端留白
 HOVER = (240, 214, 198, 255)
 HOVER_DANGER = (250, 214, 210, 255)
 SEC_COL = (160, 138, 124, 255)
 
 
-def menu_layout(items):
-    """把選單攤平成一列列 (種類, 項目, y, 高, 縮排層級)，並回傳總高度。
-    項目可以是：一般項目、{"section": 分類名}、{"sep": True}、{"children": [...], "open": 是否展開}（可收合的群組）。"""
-    rows, y = [], HEAD_H
+def menu_layout(items, header=True):
+    """把選單攤平成一列列 (種類, 項目, y, 高, 0)，並回傳總高度。
+    項目可以是：一般項目、{"section": 分類名}、{"sep": True}、{"children": [...]}（游標停上去會飛出子選單）。"""
+    rows, y = [], (HEAD_H if header else TOP_PAD)
     for it in items:
         if "section" in it:
             rows.append(("section", it, y, SEC_H, 0))
@@ -646,10 +645,6 @@ def menu_layout(items):
         elif "children" in it:
             rows.append(("group", it, y, ROW_H, 0))
             y += ROW_H
-            if it.get("open"):
-                for ch in it["children"]:
-                    rows.append(("item", ch, y, SUB_ROW_H, 1))
-                    y += SUB_ROW_H
         else:
             rows.append(("item", it, y, ROW_H, 0))
             y += ROW_H
@@ -660,10 +655,10 @@ _menu_layers = {}
 _hover_cache = {}
 
 
-def menu_layers(rows, h):
+def menu_layers(rows, h, header=True):
     """選單分成「卡片底」與「文字圖示」兩層，各畫一次就快取；游標移到哪一列，只需要在中間補一塊色塊。"""
-    sig = (h,) + tuple((k, it.get("section") or it.get("label"), it.get("hint"), it.get("icon"), bool(it.get("open")), d, y)
-                       for k, it, y, _, d in rows)
+    sig = (h, header, i18n.get_lang()) + tuple((k, it.get("section") or it.get("label"), it.get("hint"), it.get("icon"), y)
+                                               for k, it, y, _, _ in rows)
     if sig in _menu_layers:
         return _menu_layers[sig]
     base, top = Pen(MENU_W, h, SS), Pen(MENU_W, h, SS)
@@ -671,16 +666,16 @@ def menu_layers(rows, h):
     base.poly(rrect_points(x0 + 3, y0 + 3, x1 + 3, y1 + 3, 10, 3, amp=0.3, n=4), (96, 76, 68, 255), ow=1.6, out=(96, 76, 68, 255))
     base.poly(rrect_points(x0, y0, x1, y1, 10, 5, amp=0.35, n=4), (255, 250, 240, 255), ow=1.7, out=LINE)
 
-    # 標題列：小克的臉 + 名字
-    fx, fy = x0 + 10, y0 + 8
-    base.rrect(fx, fy, fx + 15, fy + 12, 3.5, BODYC, ow=1.3, out=LINE)
-    base.ellipse(fx + 3.4, fy + 3.2, fx + 5.4, fy + 7, INK)
-    base.ellipse(fx + 9.6, fy + 3.2, fx + 11.6, fy + 7, INK)
-    put_text(top, fx + 21, fy - 2, "小克", 12.5, INK)
-    for dx in range(x0 + 9, x1 - 8, 6):
-        base.d.line([base.p(dx, y0 + HEAD_H - 4), base.p(dx + 3, y0 + HEAD_H - 4)], fill=(200, 176, 160, 255), width=round(1.2 * SS))
+    if header:  # 標題列：小克的臉 + 名字
+        fx, fy = x0 + 10, y0 + 8
+        base.rrect(fx, fy, fx + 15, fy + 12, 3.5, BODYC, ow=1.3, out=LINE)
+        base.ellipse(fx + 3.4, fy + 3.2, fx + 5.4, fy + 7, INK)
+        base.ellipse(fx + 9.6, fy + 3.2, fx + 11.6, fy + 7, INK)
+        put_text(top, fx + 21, fy - 2, t("name"), 12.5, INK)
+        for dx in range(x0 + 9, x1 - 8, 6):
+            base.d.line([base.p(dx, y0 + HEAD_H - 4), base.p(dx + 3, y0 + HEAD_H - 4)], fill=(200, 176, 160, 255), width=round(1.2 * SS))
 
-    for kind, it, ry, rh, depth in rows:
+    for kind, it, ry, rh, _ in rows:
         ry += y0
         if kind == "section":
             put_text(top, x0 + 12, ry + 4, it["section"], 10.5, SEC_COL)
@@ -690,19 +685,14 @@ def menu_layers(rows, h):
         if kind == "sep":
             base.d.line([base.p(x0 + 12, ry + 4), base.p(x1 - 12, ry + 4)], fill=(214, 192, 176, 255), width=round(1.1 * SS))
             continue
-        danger = it.get("danger", False)
-        ix = x0 + (16 if depth else 0)  # 子項目往右縮排
-        if depth:
-            base.d.line([base.p(x0 + 19, ry), base.p(x0 + 19, ry + rh)], fill=(226, 208, 192, 255), width=round(1.3 * SS))
-        put_text(top, ix + 11, ry + (rh - 18) / 2 + 0.5, it["icon"], 13 if depth else 14, None, emoji=True)
-        col = (180, 56, 50, 255) if danger else INK
-        put_text(top, ix + 34, ry + (rh - 17) / 2 - 0.5, it["label"], 12 if depth else 12.5, col)
-        if kind == "group":  # 收合箭頭：▸ 收起、▾ 展開
-            ax, ay = x1 - 17, ry + rh / 2
+        col = (180, 56, 50, 255) if it.get("danger") else INK
+        put_text(top, x0 + 11, ry + (rh - 18) / 2 + 0.5, it["icon"], 14, None, emoji=True)
+        put_text(top, x0 + 34, ry + (rh - 17) / 2 - 0.5, it["label"], 12.5, col)
+        if kind == "group":  # ▸ 表示游標停上去會飛出子選單
+            ax, ay = x1 - 15, ry + rh / 2
             if it.get("hint"):  # 目前的選擇，淡淡地寫在箭頭左邊
                 put_text(top, ax - 9 - text_width(it["hint"], 10.5), ry + (rh - 15) / 2, it["hint"], 10.5, SEC_COL)
-            tri = [(ax - 3, ay - 4), (ax - 3, ay + 4), (ax + 3.5, ay)] if not it.get("open") else [(ax - 4.5, ay - 2.5), (ax + 4.5, ay - 2.5), (ax, ay + 3.5)]
-            top.poly(tri, SEC_COL)
+            top.poly([(ax - 3, ay - 4), (ax - 3, ay + 4), (ax + 3.5, ay)], SEC_COL)
     layers = (base.im.resize((MENU_W, h), Image.LANCZOS), top.im.resize((MENU_W, h), Image.LANCZOS))
     if len(_menu_layers) > 24:
         _menu_layers.clear()
@@ -710,18 +700,17 @@ def menu_layers(rows, h):
     return layers
 
 
-def render_menu(rows, total_h, hover):
+def render_menu(rows, total_h, hover, header=True):
     """右鍵選單：小而淡的米白卡片，細黑框、小陰影，游標停的那一列只淡淡染色。"""
-    base, top = menu_layers(rows, total_h)
+    base, top = menu_layers(rows, total_h, header)
     img = base.copy()
     if 0 <= hover < len(rows) and rows[hover][0] in ("item", "group"):
-        kind, it, ry, rh, depth = rows[hover]
+        kind, it, ry, rh, _ = rows[hover]
         danger = it.get("danger", False)
-        key = (depth, rh, danger)
+        key = (rh, danger)
         if key not in _hover_cache:
             pen = Pen(MENU_W, rh, SS)
-            ix = 2 + (16 if depth else 0)
-            pen.rrect(ix + 5, 1.5, MENU_W - 6 - 5, rh - 1.5, 7, HOVER_DANGER if danger else HOVER)
+            pen.rrect(7, 1.5, MENU_W - 11, rh - 1.5, 7, HOVER_DANGER if danger else HOVER)
             _hover_cache[key] = pen.im.resize((MENU_W, rh), Image.LANCZOS)
         img.alpha_composite(_hover_cache[key], (0, ry + 2))
     img.alpha_composite(top)
@@ -758,57 +747,107 @@ class FloatWindow:
 
 
 class CardMenu(FloatWindow):
-    """自己畫的右鍵選單（取代系統灰灰的原生選單）。群組點一下就在原地展開、再點收起。"""
+    """自己畫的右鍵選單（取代系統灰灰的原生選單）。
+    有 ▸ 的列，游標停上去就在右側（放不下就改左側）飛出子選單，像 Windows 的選單；只有最外層的選單負責
+    取得焦點與「游標離開太久就收起來」，子選單只是跟著它。"""
 
-    def __init__(self, pet, items, x, y):
+    def __init__(self, pet, items, x, y, parent=None):
         super().__init__(pet.root, MENU_ALPHA)
-        self.pet, self.items = pet, items
+        self.pet, self.items, self.parent = pet, items, parent
         self.hover = -1
-        self.rows, h = menu_layout(items)
+        self.child, self.child_row, self.timer = None, -1, None
+        self.rows, h = menu_layout(items, header=parent is None)
         self.size = (MENU_W, h)
         sw, sh = pet.root.winfo_screenwidth(), pet.root.winfo_screenheight()
         self.px = max(0, min(sw - MENU_W - 2, x))
-        self.py = y if y + h < sh - 4 else y - h
-        self.place_menu()
+        self.py = y if (parent or y + h < sh - 4) else y - h
+        self.move(self.px, max(0, min(self.py, sh - h - 4)), *self.size)
         c = self.canvas
         c.bind("<Motion>", lambda e: self.set_hover(self.row_at(e.y)))
         c.bind("<Leave>", lambda e: self.set_hover(-1))
+        c.bind("<Enter>", lambda e: self.entered())
         c.bind("<ButtonRelease-1>", self.on_click)
-        c.bind("<ButtonPress-3>", lambda e: self.close())
-        self.win.bind("<Escape>", lambda e: self.close())
-        self.win.bind("<FocusOut>", lambda e: self.close())
+        c.bind("<ButtonPress-3>", lambda e: self.root_menu().close())
         self.outside_since = None
         self.draw()
-        self.win.focus_force()
-        self.win.after(250, self.watch)
-        threading.Thread(target=self.warm, daemon=True).start()
+        if parent is None:
+            self.win.bind("<Escape>", lambda e: self.close())
+            self.win.bind("<FocusOut>", lambda e: self.close())
+            self.win.focus_force()
+            self.win.after(250, self.watch)
 
-    def warm(self):
-        """背景先把「展開某個群組」的各種版面畫好，點下去時就不用現畫（第一次要 60ms 上下）。"""
-        try:
-            for g in [i for i in self.items if "children" in i]:
-                rows, h = menu_layout([dict(i, open=not i.get("open", False)) if i is g else i for i in self.items])
-                menu_layers(rows, h)
-        except Exception:
-            pass
+    # —— 串連的選單 ——
+    def root_menu(self):
+        m = self
+        while m.parent:
+            m = m.parent
+        return m
 
-    def place_menu(self):
-        sh = self.pet.root.winfo_screenheight()
-        self.move(self.px, max(0, min(self.py, sh - self.size[1] - 4)), *self.size)
+    def chain(self):
+        m = self
+        while m:
+            yield m
+            m = m.child
 
+    def entered(self):
+        """游標進到這一層：它和上層排隊中的「收起子選單」都取消。"""
+        m = self
+        while m:
+            m.cancel_timer()
+            m = m.parent
+
+    def cancel_timer(self):
+        if self.timer:
+            try:
+                self.win.after_cancel(self.timer)
+            except tk.TclError:
+                pass
+            self.timer = None
+
+    # —— 游標與子選單 ——
     def row_at(self, y):
         y -= 2
-        for i, (kind, it, ry, rh, depth) in enumerate(self.rows):
+        for i, (kind, it, ry, rh, _) in enumerate(self.rows):
             if kind in ("item", "group") and ry <= y < ry + rh:
                 return i
         return -1
 
     def draw(self):
-        self.set_image(render_menu(self.rows, self.size[1], self.hover))
+        hl = self.hover if self.hover >= 0 else self.child_row  # 子選單開著時，它的母列維持反白
+        self.set_image(render_menu(self.rows, self.size[1], hl, header=self.parent is None))
 
     def set_hover(self, i):
-        if i != self.hover:
-            self.hover = i
+        if i == self.hover:
+            return
+        self.hover = i
+        self.draw()
+        if i < 0:
+            return
+        self.cancel_timer()
+        if self.rows[i][0] == "group":
+            if i != self.child_row:
+                self.timer = self.win.after(110, lambda: self.open_child(i))
+        elif self.child:  # 移到別列：稍等一下再收起，讓游標有時間斜著滑進子選單
+            self.timer = self.win.after(320, self.close_child)
+
+    def open_child(self, i):
+        self.timer = None
+        self.close_child()
+        kind, it, ry, rh, _ = self.rows[i]
+        sw = self.pet.root.winfo_screenwidth()
+        x = self.px + MENU_W - 12
+        if x + MENU_W > sw - 2:
+            x = self.px - MENU_W + 12
+        self.child = CardMenu(self.pet, it["children"], x, self.py + ry - TOP_PAD, parent=self)
+        self.child_row = i
+        self.draw()
+
+    def close_child(self):
+        if self.child:
+            self.child.close()
+            self.child = None
+        if self.child_row != -1:
+            self.child_row = -1
             self.draw()
 
     def on_click(self, e):
@@ -817,27 +856,29 @@ class CardMenu(FloatWindow):
             return
         kind, it = self.rows[i][0], self.rows[i][1]
         if kind == "group":
-            it["open"] = not it.get("open", False)
-            self.rows, h = menu_layout(self.items)
-            self.size = (MENU_W, h)
-            self.place_menu()
-            self.hover = self.row_at(e.y)
-            self.draw()
+            self.cancel_timer()
+            if i != self.child_row:
+                self.open_child(i)
             return
         cb = it["cb"]
-        self.close()
+        self.root_menu().close()
         self.pet.root.after(30, cb)
 
-    def watch(self):
-        """保險：游標離開選單超過 1.5 秒就自動收起（有些情況收不到失去焦點的通知）。"""
+    def contains(self, x, y):
         try:
-            x, y = self.pet.root.winfo_pointerxy()
             wx, wy = self.win.winfo_rootx(), self.win.winfo_rooty()
         except tk.TclError:
+            return False
+        return wx - 12 <= x <= wx + self.size[0] + 12 and wy - 12 <= y <= wy + self.size[1] + 12
+
+    def watch(self):
+        """保險：游標離開整串選單超過 1.5 秒就自動收起（有些情況收不到失去焦點的通知）。"""
+        try:
+            x, y = self.pet.root.winfo_pointerxy()
+        except tk.TclError:
             return
-        inside = wx - 12 <= x <= wx + self.size[0] + 12 and wy - 12 <= y <= wy + self.size[1] + 12
         now = time.time()
-        if inside:
+        if any(m.contains(x, y) for m in self.chain()):
             self.outside_since = None
         elif self.outside_since is None:
             self.outside_since = now
@@ -847,6 +888,10 @@ class CardMenu(FloatWindow):
         self.win.after(250, self.watch)
 
     def close(self):
+        self.cancel_timer()
+        if self.child:
+            self.child.close()
+            self.child = None
         if self.pet.menu is self:
             self.pet.menu = None
         try:
@@ -857,7 +902,6 @@ class CardMenu(FloatWindow):
 
 # ───────────────────────── 寵物視窗 ─────────────────────────
 
-SIZES = [(0.6, "小"), (0.8, "中"), (1.0, "大"), (1.3, "特大")]
 LAYOUT_VERSION = 3  # 版面改過時加一，舊的視窗位置就作廢重算
 
 
@@ -888,6 +932,8 @@ class Pet:
             self.cfg["layout"] = LAYOUT_VERSION
             save_config(self.cfg)
         self.scale = float(self.cfg.get("scale", 0.8))
+        i18n.set_lang(self.cfg.get("lang", i18n.DEFAULT))
+        self.settings = None  # 設定視窗（開著時才有）
         root.overrideredirect(True)
         root.attributes("-topmost", True)
         root.attributes("-transparentcolor", "#010101")
@@ -948,14 +994,10 @@ class Pet:
         save_config(self.cfg)
         self.place()
 
-    def size_label(self):
-        return min(SIZES, key=lambda s: abs(s[0] - self.scale))[1]
-
-    def cycle_size(self):
-        nxt = min((s for s, _ in SIZES if s > self.scale + 0.01), default=SIZES[0][0])
-        self.cfg["scale"] = nxt
+    def set_scale(self, v):
+        self.cfg["scale"] = v
         save_config(self.cfg)
-        self.scale = nxt
+        self.scale = v
         self.layout()
 
     def save_cfg(self):
@@ -964,41 +1006,55 @@ class Pet:
     def toggle_auto(self):
         self.cfg["disabled"] = not self.cfg.get("disabled", False)
         save_config(self.cfg)
-        self.say("不會再自動出現了" if self.cfg["disabled"] else "我會自動出現囉")
+        self.say(t("bubble.auto_off") if self.cfg["disabled"] else t("bubble.auto_on"))
+        if self.settings:
+            self.settings.refresh()
+
+    def set_language(self, code):
+        if code == i18n.get_lang():
+            return
+        i18n.set_lang(code)
+        self.cfg["lang"] = code
+        save_config(self.cfg)
+        self.chat.apply_lang()
+        if self.settings:  # 設定視窗的字是畫在底圖上的，直接在原位置重開一個
+            pos = self.settings.pos
+            self.settings.close()
+            self.settings = settings.SettingsWindow(self, sys.modules[__name__], pos)
+
+    def open_settings(self):
+        if self.settings:
+            self.settings.show()
+        else:
+            self.settings = settings.SettingsWindow(self, sys.modules[__name__])
 
     # —— 右鍵選單 ——
     def show_menu(self, e):
         if self.menu:
             self.menu.close()
         c = self.chat
-        auto_on = not self.cfg.get("disabled", False)
-        models = [dict(icon="✅" if v == c.model else "⚪", label=name.split("（")[0], cb=lambda v=v: c.choose_model(v))
-                  for name, v in chat.MODELS]
+        models = [dict(icon="✅" if v == c.model else "⚪", label=chat.model_short(v), cb=lambda v=v: c.choose_model(v))
+                  for _, v in chat.MODELS]
         actions = [
-            dict(icon="💖", label="摸摸", cb=self.pet_it),
-            dict(icon="😴", label="叫醒" if self.mode == "sleep" else "睡覺", cb=self.toggle_sleep),
-            dict(icon="🎉", label="開心跳", cb=lambda: self.demo("happy", 3.2)),
-            dict(icon="🤔", label="思考", cb=lambda: self.demo("thinking", 4.0)),
-            dict(icon="⌨️", label="敲鍵盤", cb=lambda: self.demo("working_type", 4.0)),
-            dict(icon="🔍", label="放大鏡", cb=lambda: self.demo("working_search", 4.0)),
-            dict(icon="😵", label="眩暈", cb=lambda: self.demo("error", 2.6)),
-            dict(icon="👋", label="招手", cb=lambda: self.demo("attention", 3.5)),
-        ]
-        settings = [
-            dict(icon="📍", label="重設位置", cb=self.reset_pos),
-            dict(icon="📏", label=f"大小：{self.size_label()}", cb=self.cycle_size),
-            dict(icon="🔔", label="自動出現：開" if auto_on else "自動出現：關", cb=self.toggle_auto),
+            dict(icon="💖", label=t("act.pet"), cb=self.pet_it),
+            dict(icon="😴", label=t("act.wake") if self.mode == "sleep" else t("act.sleep"), cb=self.toggle_sleep),
+            dict(icon="🎉", label=t("act.happy"), cb=lambda: self.demo("happy", 3.2)),
+            dict(icon="🤔", label=t("act.think"), cb=lambda: self.demo("thinking", 4.0)),
+            dict(icon="⌨️", label=t("act.type"), cb=lambda: self.demo("working_type", 4.0)),
+            dict(icon="🔍", label=t("act.search"), cb=lambda: self.demo("working_search", 4.0)),
+            dict(icon="😵", label=t("act.dizzy"), cb=lambda: self.demo("error", 2.6)),
+            dict(icon="👋", label=t("act.wave"), cb=lambda: self.demo("attention", 3.5)),
         ]
         items = [
-            dict(section="對話"),
-            dict(icon="💬", label="跟小克聊天", cb=c.open),
-            dict(icon="📊", label="配額", cb=c.show_quota),
-            dict(icon="🧠", label="模型", hint=chat.model_label(c.model).split("（")[0], children=models),
-            dict(section="小克"),
-            dict(icon="🎭", label="動作", children=actions),
-            dict(icon="⚙️", label="設定", children=settings),
+            dict(section=t("section.chat")),
+            dict(icon="💬", label=t("menu.chat"), cb=c.open),
+            dict(icon="📊", label=t("menu.quota"), cb=c.show_quota),
+            dict(icon="🧠", label=t("menu.model"), hint=chat.model_short(c.model), children=models),
+            dict(section=t("section.pet")),
+            dict(icon="🎭", label=t("menu.actions"), children=actions),
+            dict(icon="⚙️", label=t("menu.settings"), cb=self.open_settings),
             dict(sep=True),
-            dict(icon="👋", label="先收起來", cb=self.root.destroy, danger=True),
+            dict(icon="✖️", label=t("menu.close"), cb=self.root.destroy, danger=True),
         ]
         self.menu = CardMenu(self, items, e.x_root, e.y_root)
 
@@ -1043,7 +1099,7 @@ class Pet:
         if self.mode == "sleep":
             self.wake()
         self.petted_until = time.time() + 2.4
-        self.say(random.choice(BUBBLES["petted"]), "petted")
+        self.say(phrase("petted"), "petted")
 
     def toggle_sleep(self):
         if self.mode == "sleep":
@@ -1054,7 +1110,7 @@ class Pet:
     def wake(self):
         self.set_mode("idle")
         self.last_event = time.time()
-        self.say(random.choice(BUBBLES["wake"]))
+        self.say(phrase("wake"))
 
     def set_mode(self, mode, hold=None, then="idle"):
         self.mode, self.mode_since, self.hold, self.then = mode, time.time(), hold, then
@@ -1083,8 +1139,8 @@ class Pet:
             return  # 舊的狀態檔（例如手動啟動時殘留的），不理它
         self.last_event = time.time()
         self.set_mode(state, ev.get("hold"), ev.get("then", "idle"))
-        if state in BUBBLES and state != "petted":
-            self.say(random.choice(BUBBLES[state]), state, 3.6 if state == "attention" else 2.4)
+        if state in ("happy", "attention", "error"):
+            self.say(phrase(state), state, 3.6 if state == "attention" else 2.4)
 
     def update_mode(self):
         now = time.time()
@@ -1166,19 +1222,18 @@ def acquire_lock():
 
 
 def make_ui_sheet(path):
-    """泡泡與選單的預覽圖（開發用）：深色與淺色背景各一排；選單有收合與展開兩種。"""
-    kinds = [("做好了！", "happy"), ("需要你看一下！", "attention"), ("暈了暈了…", "error"), ("嘿嘿～", "petted"), ("嗯？", "cream")]
-
-    def sample(open_group):
-        acts = [dict(icon="💖", label="摸摸"), dict(icon="😴", label="睡覺"), dict(icon="🎉", label="開心跳"), dict(icon="😵", label="眩暈")]
-        return [dict(section="對話"), dict(icon="💬", label="跟小克聊天"), dict(icon="📊", label="配額"),
-                dict(icon="🧠", label="模型", hint="Sonnet 5.5", children=[dict(icon="✅", label="Sonnet 5.5"), dict(icon="⚪", label="Opus 5.5")]),
-                dict(section="小克"), dict(icon="🎭", label="動作", children=acts, open=open_group),
-                dict(icon="⚙️", label="設定", children=[]), dict(sep=True), dict(icon="👋", label="先收起來", danger=True)]
-
-    menus = [menu_layout(sample(False)), menu_layout(sample(True))]
-    menu_h = max(h for _, h in menus)
-    row_h = 52 + menu_h + 20
+    """泡泡與選單的預覽圖（開發用）：深色與淺色背景各一排；選單含飛出的子選單。"""
+    kinds = [("Done!", "happy"), ("Need your attention!", "attention"), ("Oops…", "error"), ("Hehe~", "petted"), ("Hm?", "cream")]
+    models = [dict(icon="✅", label="Sonnet 5.5"), dict(icon="⚪", label="Opus 5.5"), dict(icon="⚪", label="Haiku 4.5")]
+    acts = [dict(icon="💖", label="Pet me"), dict(icon="😴", label="Sleep"), dict(icon="🎉", label="Celebrate"), dict(icon="😵", label="Dizzy")]
+    items = [dict(section="Chat"), dict(icon="💬", label="Chat with Claude"), dict(icon="📊", label="Usage"),
+             dict(icon="🧠", label="Model", hint="Sonnet 5.5", children=models),
+             dict(section="Pet"), dict(icon="🎭", label="Actions", children=acts),
+             dict(icon="⚙️", label="Settings…"), dict(sep=True), dict(icon="✖️", label="Close", danger=True)]
+    rows, h = menu_layout(items)
+    sub_rows, sub_h = menu_layout(models, header=False)
+    group = next(i for i, r in enumerate(rows) if r[0] == "group")
+    row_h = 52 + h + 20
     sheet = Image.new("RGB", (900, row_h * 2), (30, 30, 36))
     for r, bg in enumerate(((30, 30, 36), (246, 242, 232))):
         y0 = r * row_h
@@ -1188,10 +1243,12 @@ def make_ui_sheet(path):
             im = render_bubble(txt, kind, 6, 30)
             sheet.paste(im, (x, y0 + 4), im)
             x += im.width + 10
-        for c, (rows, h) in enumerate(menus):
-            hv = next((i for i, row in enumerate(rows) if row[0] in ("item", "group")), -1) if c else -1
-            im = render_menu(rows, h, hv)
-            sheet.paste(im, (10 + c * (MENU_W + 16), y0 + 56), im)
+        im = render_menu(rows, h, 1)
+        sheet.paste(im, (10, y0 + 56), im)
+        im = render_menu(rows, h, group)  # 游標停在「模型」：右側飛出子選單
+        sheet.paste(im, (10 + MENU_W + 40, y0 + 56), im)
+        im = render_menu(sub_rows, sub_h, 0, header=False)
+        sheet.paste(im, (10 + MENU_W + 40 + MENU_W - 12, y0 + 56 + rows[group][2] - TOP_PAD), im)
     sheet.save(path)
 
 
