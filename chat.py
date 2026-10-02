@@ -492,6 +492,7 @@ class ChatWindow:
         self.busy = False
         self.mode = None
         self.layout_job = None
+        self.quota_key = None
         self.pos = (0, 0)
         self.status_tick = 0
         cream, paper = hexc(CREAM), hexc(PAPER)
@@ -608,8 +609,11 @@ class ChatWindow:
         put(self.i_new, R - self.new_chip.w, cy)
         qy = cy + 26 + 8
         put(self.quota_item, L, qy)
-        self.quota_photo = photo(render_quota(kit, R - L, self.chat.quota), CREAM)
-        c.itemconfigure(self.quota_item, image=self.quota_photo)
+        qkey = (R - L, json.dumps(self.chat.quota, sort_keys=True), int(time.time() // 60))
+        if qkey != self.quota_key:  # 配額沒變（也沒跨過一分鐘）就不重畫
+            self.quota_key = qkey
+            self.quota_photo = photo(render_quota(kit, R - L, self.chat.quota), CREAM)
+            c.itemconfigure(self.quota_item, image=self.quota_photo)
         mx0, my0, mx1, my1 = r["msg"]
         put(self.i_msg, mx0 + 6, my0 + 6, mx1 - mx0 - 12, my1 - my0 - 12)
         put(self.i_status, r["status"][0] + 2, r["status"][1], R - L - 4, 18)
@@ -625,14 +629,15 @@ class ChatWindow:
             self.card_label.config(wraplength=px1 - px0 - 40)
         else:
             c.itemconfigure(self.i_card, state="hidden")
-        self.bg_photo = kit.to_tk(self.render_frame(r))
+        # 拉伸視窗的過程中用低解析度的底圖（快 4 倍），放開滑鼠才畫完整品質
+        resizing = bool(self.drag and self.drag[0] == "size")
+        self.bg_photo = kit.to_tk(self.render_frame(r, 1 if resizing else 2))
         c.itemconfigure(self.bg_item, image=self.bg_photo)
         c.tag_lower(self.bg_item)
 
-    def render_frame(self, r):
+    def render_frame(self, r, k=2):
         kit = self.kit
         W, H = self.W, self.H
-        k = 2
         pen = kit.Pen(W, H, k)
         x0, y0, x1, y1 = r["card"]
         pen.poly(kit.rrect_points(x0 + 4, y0 + 4, x1 + 4, y1 + 4, 18, 3, amp=0.3, n=6), SHADOW_C, ow=2.2, out=SHADOW_C)
@@ -715,7 +720,10 @@ class ChatWindow:
         cfg["chat_x"], cfg["chat_y"] = self.pos
         cfg["chat_size"] = [self.W, self.H]
         self.chat.pet.save_cfg()
+        was_resizing = self.drag[0] == "size"
         self.drag = None
+        if was_resizing:
+            self.relayout()  # 補畫完整品質的底圖
 
     def open_model_menu(self):
         items = []

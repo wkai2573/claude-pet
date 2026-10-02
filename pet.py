@@ -12,8 +12,10 @@ import math
 import random
 import socket
 import sys
+import threading
 import time
 import tkinter as tk
+from collections import OrderedDict
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageTk
@@ -440,13 +442,72 @@ def render(mode, t, variant=0, scale=1.0):
     return frame
 
 
-def to_tk(img):
+def key_image(img):
     """視窗只能整格透明或整格不透明：半透明的邊緣二選一，並保留邊緣原本的深色輪廓色，
-    這樣在淺色背景上不會有一圈黑色暈邊。"""
+    這樣在淺色背景上不會有一圈黑色暈邊。回傳貼在透明色上的 RGB 圖（不碰 Tk，背景執行緒也能做）。"""
     mask = img.getchannel("A").point(lambda v: 255 if v >= 100 else 0)
     bg = Image.new("RGB", img.size, KEY)
     bg.paste(img.convert("RGB"), mask=mask)
-    return ImageTk.PhotoImage(bg)
+    return bg
+
+
+def to_tk(img):
+    return ImageTk.PhotoImage(key_image(img))
+
+
+# 每種動作循環幾格（動作只由 t 決定，所以畫過一次就能重複使用；循環接縫處的細微差異看不出來）
+LOOP = {"idle": 180, "thinking": 90, "working_type": 72, "working_search": 60, "happy": 48,
+        "error": 60, "attention": 40, "sleep": 100, "petted": 40}
+LOOKAHEAD = 12  # 每次請背景執行緒往前備好幾格
+
+
+class FrameCache:
+    """動畫影格快取。畫一格要 50ms 上下（特大尺寸 130ms+），放在 UI 執行緒會讓滑鼠、選單、
+    對話視窗的輸入全部卡住；所以交給背景執行緒先畫好，UI 執行緒只負責貼圖。"""
+
+    BUDGET = 40 * 1024 * 1024  # 影格總共最多佔這麼多記憶體，超過就丟掉最久沒用的
+
+    def __init__(self):
+        self.frames = OrderedDict()
+        self.bytes = 0
+        self.lock = threading.Lock()
+        self.wake = threading.Event()
+        self.wanted = []
+        threading.Thread(target=self.work, daemon=True).start()
+
+    def get(self, key):
+        with self.lock:
+            img = self.frames.get(key)
+            if img is not None:
+                self.frames.move_to_end(key)
+            return img
+
+    def want(self, keys):
+        with self.lock:
+            self.wanted = keys
+        self.wake.set()
+
+    def work(self):
+        while True:
+            self.wake.wait()
+            while True:
+                with self.lock:
+                    key = next((k for k in self.wanted if k not in self.frames), None)
+                    if key is None:
+                        self.wake.clear()
+                        break
+                try:
+                    mode, t, variant, scale = key
+                    img = key_image(render(mode, t, variant, scale))
+                except Exception:
+                    time.sleep(0.2)
+                    continue
+                with self.lock:
+                    self.frames[key] = img
+                    self.bytes += img.width * img.height * 3
+                    while self.bytes > self.BUDGET and len(self.frames) > 1:
+                        _, old = self.frames.popitem(last=False)
+                        self.bytes -= old.width * old.height * 3
 
 
 def make_sheet(path):
@@ -595,50 +656,76 @@ def menu_layout(items):
     return rows, y + 10
 
 
-def render_menu(rows, total_h, hover):
-    """右鍵選單：小而淡的米白卡片，細黑框、小陰影，游標停的那一列只淡淡染色。"""
-    h = total_h
-    pen = Pen(MENU_W, h, SS)
+_menu_layers = {}
+_hover_cache = {}
+
+
+def menu_layers(rows, h):
+    """選單分成「卡片底」與「文字圖示」兩層，各畫一次就快取；游標移到哪一列，只需要在中間補一塊色塊。"""
+    sig = (h,) + tuple((k, it.get("section") or it.get("label"), it.get("hint"), it.get("icon"), bool(it.get("open")), d, y)
+                       for k, it, y, _, d in rows)
+    if sig in _menu_layers:
+        return _menu_layers[sig]
+    base, top = Pen(MENU_W, h, SS), Pen(MENU_W, h, SS)
     x0, y0, x1, y1 = 2, 2, MENU_W - 6, h - 6
-    pen.poly(rrect_points(x0 + 3, y0 + 3, x1 + 3, y1 + 3, 10, 3, amp=0.3, n=4), (96, 76, 68, 255), ow=1.6, out=(96, 76, 68, 255))
-    pen.poly(rrect_points(x0, y0, x1, y1, 10, 5, amp=0.35, n=4), (255, 250, 240, 255), ow=1.7, out=LINE)
+    base.poly(rrect_points(x0 + 3, y0 + 3, x1 + 3, y1 + 3, 10, 3, amp=0.3, n=4), (96, 76, 68, 255), ow=1.6, out=(96, 76, 68, 255))
+    base.poly(rrect_points(x0, y0, x1, y1, 10, 5, amp=0.35, n=4), (255, 250, 240, 255), ow=1.7, out=LINE)
 
     # 標題列：小克的臉 + 名字
     fx, fy = x0 + 10, y0 + 8
-    pen.rrect(fx, fy, fx + 15, fy + 12, 3.5, BODYC, ow=1.3, out=LINE)
-    pen.ellipse(fx + 3.4, fy + 3.2, fx + 5.4, fy + 7, INK)
-    pen.ellipse(fx + 9.6, fy + 3.2, fx + 11.6, fy + 7, INK)
-    put_text(pen, fx + 21, fy - 2, "小克", 12.5, INK)
+    base.rrect(fx, fy, fx + 15, fy + 12, 3.5, BODYC, ow=1.3, out=LINE)
+    base.ellipse(fx + 3.4, fy + 3.2, fx + 5.4, fy + 7, INK)
+    base.ellipse(fx + 9.6, fy + 3.2, fx + 11.6, fy + 7, INK)
+    put_text(top, fx + 21, fy - 2, "小克", 12.5, INK)
     for dx in range(x0 + 9, x1 - 8, 6):
-        pen.d.line([pen.p(dx, y0 + HEAD_H - 4), pen.p(dx + 3, y0 + HEAD_H - 4)], fill=(200, 176, 160, 255), width=round(1.2 * SS))
+        base.d.line([base.p(dx, y0 + HEAD_H - 4), base.p(dx + 3, y0 + HEAD_H - 4)], fill=(200, 176, 160, 255), width=round(1.2 * SS))
 
-    for i, (kind, it, ry, rh, depth) in enumerate(rows):
+    for kind, it, ry, rh, depth in rows:
         ry += y0
         if kind == "section":
-            put_text(pen, x0 + 12, ry + 4, it["section"], 10.5, SEC_COL)
+            put_text(top, x0 + 12, ry + 4, it["section"], 10.5, SEC_COL)
             lx = x0 + 18 + text_width(it["section"], 10.5)
-            pen.d.line([pen.p(lx, ry + 11.5), pen.p(x1 - 12, ry + 11.5)], fill=(226, 208, 192, 255), width=round(1.1 * SS))
+            base.d.line([base.p(lx, ry + 11.5), base.p(x1 - 12, ry + 11.5)], fill=(226, 208, 192, 255), width=round(1.1 * SS))
             continue
         if kind == "sep":
-            pen.d.line([pen.p(x0 + 12, ry + 4), pen.p(x1 - 12, ry + 4)], fill=(214, 192, 176, 255), width=round(1.1 * SS))
+            base.d.line([base.p(x0 + 12, ry + 4), base.p(x1 - 12, ry + 4)], fill=(214, 192, 176, 255), width=round(1.1 * SS))
             continue
-        on = i == hover
         danger = it.get("danger", False)
         ix = x0 + (16 if depth else 0)  # 子項目往右縮排
-        if on:
-            pen.rrect(ix + 5, ry + 1.5, x1 - 5, ry + rh - 1.5, 7, HOVER_DANGER if danger else HOVER)
         if depth:
-            pen.d.line([pen.p(x0 + 19, ry), pen.p(x0 + 19, ry + rh)], fill=(226, 208, 192, 255), width=round(1.3 * SS))
-        put_text(pen, ix + 11, ry + (rh - 18) / 2 + 0.5, it["icon"], 13 if depth else 14, None, emoji=True)
+            base.d.line([base.p(x0 + 19, ry), base.p(x0 + 19, ry + rh)], fill=(226, 208, 192, 255), width=round(1.3 * SS))
+        put_text(top, ix + 11, ry + (rh - 18) / 2 + 0.5, it["icon"], 13 if depth else 14, None, emoji=True)
         col = (180, 56, 50, 255) if danger else INK
-        put_text(pen, ix + 34, ry + (rh - 17) / 2 - 0.5, it["label"], 12 if depth else 12.5, col)
+        put_text(top, ix + 34, ry + (rh - 17) / 2 - 0.5, it["label"], 12 if depth else 12.5, col)
         if kind == "group":  # 收合箭頭：▸ 收起、▾ 展開
             ax, ay = x1 - 17, ry + rh / 2
             if it.get("hint"):  # 目前的選擇，淡淡地寫在箭頭左邊
-                put_text(pen, ax - 9 - text_width(it["hint"], 10.5), ry + (rh - 15) / 2, it["hint"], 10.5, SEC_COL)
+                put_text(top, ax - 9 - text_width(it["hint"], 10.5), ry + (rh - 15) / 2, it["hint"], 10.5, SEC_COL)
             tri = [(ax - 3, ay - 4), (ax - 3, ay + 4), (ax + 3.5, ay)] if not it.get("open") else [(ax - 4.5, ay - 2.5), (ax + 4.5, ay - 2.5), (ax, ay + 3.5)]
-            pen.poly(tri, SEC_COL)
-    return pen.im.resize((MENU_W, h), Image.LANCZOS)
+            top.poly(tri, SEC_COL)
+    layers = (base.im.resize((MENU_W, h), Image.LANCZOS), top.im.resize((MENU_W, h), Image.LANCZOS))
+    if len(_menu_layers) > 24:
+        _menu_layers.clear()
+    _menu_layers[sig] = layers
+    return layers
+
+
+def render_menu(rows, total_h, hover):
+    """右鍵選單：小而淡的米白卡片，細黑框、小陰影，游標停的那一列只淡淡染色。"""
+    base, top = menu_layers(rows, total_h)
+    img = base.copy()
+    if 0 <= hover < len(rows) and rows[hover][0] in ("item", "group"):
+        kind, it, ry, rh, depth = rows[hover]
+        danger = it.get("danger", False)
+        key = (depth, rh, danger)
+        if key not in _hover_cache:
+            pen = Pen(MENU_W, rh, SS)
+            ix = 2 + (16 if depth else 0)
+            pen.rrect(ix + 5, 1.5, MENU_W - 6 - 5, rh - 1.5, 7, HOVER_DANGER if danger else HOVER)
+            _hover_cache[key] = pen.im.resize((MENU_W, rh), Image.LANCZOS)
+        img.alpha_composite(_hover_cache[key], (0, ry + 2))
+    img.alpha_composite(top)
+    return img
 
 
 class FloatWindow:
@@ -694,6 +781,16 @@ class CardMenu(FloatWindow):
         self.draw()
         self.win.focus_force()
         self.win.after(250, self.watch)
+        threading.Thread(target=self.warm, daemon=True).start()
+
+    def warm(self):
+        """背景先把「展開某個群組」的各種版面畫好，點下去時就不用現畫（第一次要 60ms 上下）。"""
+        try:
+            for g in [i for i in self.items if "children" in i]:
+                rows, h = menu_layout([dict(i, open=not i.get("open", False)) if i is g else i for i in self.items])
+                menu_layers(rows, h)
+        except Exception:
+            pass
 
     def place_menu(self):
         sh = self.pet.root.winfo_screenheight()
@@ -813,7 +910,9 @@ class Pet:
         self.state_mtime = 0
         self.petted_until = 0.0
         self.bubble = None  # (文字, 種類, 出生時間, 壽命秒)
-        self.img = None
+        self.cache = FrameCache()
+        self.shown = None  # 目前貼在畫面上的那張圖
+        self.photo = None
         self.menu = None
 
         c = self.canvas
@@ -1027,6 +1126,18 @@ class Pet:
             bw.win.attributes("-topmost", True)
             self.bubble_visible = True
 
+    def frame(self, mode):
+        """目前這一格：快取裡有就用；還沒畫好就先停在上一張，同時請背景執行緒把接下來的幾格備好。"""
+        loop = LOOP.get(mode, 60)
+        var, sc = self.variant, self.scale
+        self.cache.want([(mode, (self.t + i) % loop, var, sc) for i in range(LOOKAHEAD)])
+        img = self.cache.get((mode, self.t % loop, var, sc))
+        if img is None:
+            if self.shown is not None:
+                return self.shown
+            img = key_image(render(mode, self.t % loop, var, sc))  # 第一張只能現畫
+        return img
+
     def tick(self):
         t0 = time.time()
         self.t += 1
@@ -1034,8 +1145,11 @@ class Pet:
             self.read_state()
         self.update_mode()
         mode = "petted" if time.time() < self.petted_until else self.mode
-        self.img = to_tk(render(mode, self.t, self.variant, self.scale))
-        self.canvas.itemconfig(self.item, image=self.img)
+        img = self.frame(mode)
+        if img is not self.shown:
+            self.shown = img
+            self.photo = ImageTk.PhotoImage(img)
+            self.canvas.itemconfig(self.item, image=self.photo)
         self.draw_bubble()
         spent = int((time.time() - t0) * 1000)
         self.root.after(max(15, TICK_MS - spent), self.tick)
@@ -1106,6 +1220,7 @@ def main():
     lock = acquire_lock()
     if lock is None:
         return  # 已經有一隻在跑了
+    sys.setswitchinterval(0.002)  # 背景畫圖的執行緒更頻繁地讓出，UI 少等一點
     root = tk.Tk()
     root.title("Claude 小克")
     pet = Pet(root)
