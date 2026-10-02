@@ -672,9 +672,7 @@ def menu_layers(rows, h, header=True):
         base.rrect(fx, fy, fx + 15, fy + 12, 3.5, BODYC, ow=1.3, out=LINE)
         base.ellipse(fx + 3.4, fy + 3.2, fx + 5.4, fy + 7, INK)
         base.ellipse(fx + 9.6, fy + 3.2, fx + 11.6, fy + 7, INK)
-        put_text(top, fx + 21, fy - 2, t("name"), 12.5, INK)
-        for dx in range(x0 + 9, x1 - 8, 6):
-            base.d.line([base.p(dx, y0 + HEAD_H - 4), base.p(dx + 3, y0 + HEAD_H - 4)], fill=(200, 176, 160, 255), width=round(1.2 * SS))
+        put_text(top, fx + 21, fy - 2, t("name"), 12.5, INK)  # 下面緊接著分類小標題自帶的線，這裡不再另外畫虛線
 
     for kind, it, ry, rh, _ in rows:
         ry += y0
