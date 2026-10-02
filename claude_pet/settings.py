@@ -7,9 +7,9 @@ import tkinter as tk
 
 from PIL import Image
 
-import screens
-from i18n import LANGS, get_lang, t
-from widgets import (ACCENT_HOVER, ACCENT_P, CREAM, DIMP, INKP, PAD, PILL, PILL_HOVER, SHM, SOFT_LINE, TITLE_H,
+from . import screens
+from .i18n import LANGS, get_lang, t
+from .widgets import (ACCENT_HOVER, ACCENT_P, CREAM, DIMP, INKP, PAD, PILL, PILL_HOVER, SHM, SOFT_LINE, TITLE_H,
                      Pill, card_frame, hexc)
 
 W = 400

@@ -3,9 +3,7 @@
 一個無邊框、透明、永遠在最上層的小視窗，畫一隻手繪卡通風的方塊小人。
 hook.py 把 Claude Code 的狀態寫進 state.json，這裡輪詢它並切換動作。
 
-用法：
-    pythonw pet.py                 正常啟動（常駐桌面）
-    python  pet.py --sheet out.png 把所有動作的影格輸出成一張圖（開發用，不開視窗）
+啟動用 `claude-pet`（或 `python -m claude_pet run`）；開發用的預覽圖指令見 cli.py。
 """
 import json
 import math
@@ -20,16 +18,12 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageTk
 
-import chat
-import i18n
-import screens
-import settings
-from i18n import t
+from . import chat, i18n, paths, screens, settings
+from .i18n import t
 
-HERE = Path(__file__).resolve().parent
-STATE = HERE / "state.json"
-CONFIG = HERE / "config.json"
-PORT = 47651  # 綁住這個本機埠當作「只能有一隻」的鎖；hook.py 也靠它判斷寵物有沒有在跑
+STATE = paths.STATE
+CONFIG = paths.CONFIG
+PORT = paths.PORT  # 綁住這個本機埠當作「只能有一隻」的鎖；hook 也靠它判斷寵物有沒有在跑、安裝程式靠它請小克結束
 
 IMG_W, IMG_H = 240, 220  # 角色畫布（邏輯像素，乘上 scale 才是實際大小）
 SS = 3  # 超取樣倍率：先放大三倍畫，再縮回來，邊緣才平滑
@@ -957,6 +951,7 @@ class Pet:
         self.state_mtime = 0
         self.petted_until = 0.0
         self.bubble = None  # (文字, 種類, 出生時間, 壽命秒)
+        self.quit_flag = threading.Event()  # 別的行程（claude-pet stop）請我們結束時會被設起來
         self.cache = FrameCache()
         self.shown = None  # 目前貼在畫面上的那張圖
         self.photo = None
@@ -1199,6 +1194,9 @@ class Pet:
         return img
 
     def tick(self):
+        if self.quit_flag.is_set():
+            self.root.destroy()
+            return
         t0 = time.time()
         self.t += 1
         if self.t % 2 == 0:
@@ -1219,10 +1217,28 @@ def acquire_lock():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         s.bind(("127.0.0.1", PORT))
-        s.listen(1)
+        s.listen(5)
     except OSError:
         return None
     return s
+
+
+def serve_control(sock, quit_flag):
+    """在背景接這個埠的連線：收到 b"quit" 就請小克結束（`claude-pet stop`、解除安裝會用）。
+    只是探測有沒有在跑的連線（hook 的 is_running）會直接被關掉，不影響任何事。"""
+    while True:
+        try:
+            conn, _ = sock.accept()
+        except OSError:
+            return
+        try:
+            conn.settimeout(0.5)
+            if conn.recv(16).strip() == b"quit":
+                quit_flag.set()
+        except Exception:
+            pass
+        finally:
+            conn.close()
 
 
 def make_ui_sheet(path):
@@ -1268,27 +1284,17 @@ def make_icon(path):
     canvas.save(path, format="ICO", sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 
 
-def main():
-    if len(sys.argv) >= 3 and sys.argv[1] == "--icon":
-        make_icon(sys.argv[2])
-        return
-    if len(sys.argv) >= 3 and sys.argv[1] == "--sheet":
-        make_sheet(sys.argv[2])
-        return
-    if len(sys.argv) >= 3 and sys.argv[1] == "--ui-sheet":
-        make_ui_sheet(sys.argv[2])
-        return
+def run():
+    """在前景執行小克（關掉視窗或收到 quit 才會回來）。已經有一隻在跑就直接結束。"""
+    paths.migrate_legacy()
     lock = acquire_lock()
     if lock is None:
-        return  # 已經有一隻在跑了
+        return
     sys.setswitchinterval(0.002)  # 背景畫圖的執行緒更頻繁地讓出，UI 少等一點
     root = tk.Tk()
-    root.title("Claude 小克")
+    root.title("Claude Pet")
     pet = Pet(root)
+    threading.Thread(target=serve_control, args=(lock, pet.quit_flag), daemon=True).start()
     root.mainloop()
     pet.chat.close()
     lock.close()
-
-
-if __name__ == "__main__":
-    main()

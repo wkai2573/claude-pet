@@ -25,12 +25,11 @@ from tkinter import filedialog
 
 from PIL import Image, ImageTk
 
-import screens
-from i18n import t
-from widgets import (card_frame, CREAM, PAPER, SHADOW_C, HATCH_C, SOFT_LINE, INKP, DIMP, TRACK, GOOD, WARN, BAD, YELLOW, PILL, PILL_HOVER, ACCENT_P, ACCENT_HOVER, STOP_P, MIN_W, MIN_H, PAD, SHM, TITLE_H, hexc, photo, Pill, Scroll, render_face)
+from . import paths, screens
+from .i18n import t
+from .widgets import (card_frame, CREAM, PAPER, SHADOW_C, HATCH_C, SOFT_LINE, INKP, DIMP, TRACK, GOOD, WARN, BAD, YELLOW, PILL, PILL_HOVER, ACCENT_P, ACCENT_HOVER, STOP_P, MIN_W, MIN_H, PAD, SHM, TITLE_H, hexc, photo, Pill, Scroll, render_face)
 
-HERE = Path(__file__).resolve().parent
-QUOTA_FILE = HERE / "quota.json"
+QUOTA_FILE = paths.QUOTA
 
 MODELS = [
     ("", None),  # 預設：名稱隨語言，見 model_short()
@@ -156,7 +155,7 @@ def probe_quota(claude, out, token):
     info, err = None, None
     try:
         p = subprocess.run(cmd, input=".", capture_output=True, text=True, encoding="utf-8", timeout=75,
-                           creationflags=NO_WINDOW, cwd=str(HERE))
+                           creationflags=NO_WINDOW, cwd=str(paths.DATA))
         for line in p.stdout.splitlines():
             try:
                 o = json.loads(line)
@@ -809,9 +808,9 @@ class Chat:
         self.probing = False
         self.cfg = pet.cfg
         self.model = self.cfg.get("chat_model")
-        self.cwd = self.cfg.get("chat_cwd") or str(HERE)
+        self.cwd = self.cfg.get("chat_cwd") or str(Path.home())
         if not Path(self.cwd).is_dir():
-            self.cwd = str(HERE)
+            self.cwd = str(Path.home())
         self.always_allow = set()
         self.busy = False
         self.pet_state = (None, 0.0)

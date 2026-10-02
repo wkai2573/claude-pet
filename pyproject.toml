@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claude-pet"
+version = "0.1.0"
+description = "A hand-drawn desktop pet for Windows that follows what Claude Code is doing, and lets you chat with Claude."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["pillow>=9.2"]
+keywords = ["claude", "claude-code", "desktop-pet", "tkinter"]
+classifiers = [
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Environment :: Win32 (MS Windows)",
+    "Topic :: Desktop Environment",
+]
+
+[project.scripts]
+claude-pet = "claude_pet.cli:main"
+
+# TODO: 建好 GitHub 庫之後，把 OWNER 換成實際的帳號
+[project.urls]
+Homepage = "https://github.com/OWNER/claude-pet"
+Issues = "https://github.com/OWNER/claude-pet/issues"
+
+[tool.setuptools]
+packages = ["claude_pet"]

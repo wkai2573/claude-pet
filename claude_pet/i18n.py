@@ -1,7 +1,7 @@
 """介面文字（英文／繁體中文）。預設英文，語言存在 config.json 的 lang。
 
 用法：
-    from i18n import t
+    from .i18n import t
     t("menu.chat")                      → "Chat with Claude" / "跟小克聊天"
     t("note.connected", model="...")    → 有 {欄位} 的字串會用 format 代入
     t("bubble.happy")                   → 清單型（隨機挑一句用）
@@ -202,3 +202,10 @@ def t(key, **kw):
     if v is None:
         v = STR[DEFAULT].get(key, key)
     return v.format(**kw) if kw and isinstance(v, str) else v
+
+
+# 命令列訊息放在另一個檔案，這裡併進同一張表
+from . import cli_text  # noqa: E402
+
+STR["en"].update(cli_text.EN)
+STR["zh"].update(cli_text.ZH)

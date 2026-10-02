@@ -1,9 +1,56 @@
 # Claude 小克（claude-pet）
 
-一隻住在桌面上的手繪風小寵物，會跟著 [Claude Code](https://claude.com/claude-code) 的工作狀態做出不同的動作：
-你送出訊息時它在思考、Claude 開始敲指令時它跟著敲鍵盤、做完了它會開心跳起來。
+一隻住在 Windows 桌面上的手繪風小寵物，會跟著 [Claude Code](https://claude.com/claude-code) 的工作狀態做出不同的動作：
+你送出訊息時它在思考、Claude 開始敲指令時它跟著敲鍵盤、做完了它會開心跳起來。還能直接跟它聊天、選模型、看配額。
 
 > 這是個人興趣專案，與 Anthropic 無關。角色造型是參考社群上常見的「小克」卡通形象所畫的同人作品。
+
+## 安裝
+
+需要：Windows 10／11、Python 3.9 以上（要含 `tkinter`，python.org 的安裝程式預設就有）、已安裝並登入的 Claude Code。
+
+```powershell
+pip install git+https://github.com/<帳號>/claude-pet
+claude-pet install
+```
+
+`claude-pet install` 會做三件事：
+
+1. 把 hooks 設定進 Claude Code 的 `~/.claude/settings.json`。**先備份**，而且只加上屬於 claude-pet 的那幾筆，你原本的其他設定與 hooks 都原封不動；重複執行不會重複加。
+2. 在桌面建立「Claude Pet」捷徑。
+3. 啟動小克。
+
+裝好後，**開一個新的 Claude Code 對話**（或重啟目前的），hooks 才會生效。
+
+> - 用 pipx 或 uv 裝也可以：`pipx install git+https://github.com/<帳號>/claude-pet` 或 `uv tool install git+https://github.com/<帳號>/claude-pet`。
+> - 如果提示找不到 `claude-pet` 指令（pip 把指令放在 Python 的 `Scripts` 資料夾，不一定在 PATH 裡），改用 `python -m claude_pet install` 就行。
+> - 不想要桌面捷徑：`claude-pet install --no-shortcut`。想先看它會寫什麼、不真的改：`claude-pet install --dry-run`。
+
+### 日常使用
+
+| 指令 | 說明 |
+|---|---|
+| `claude-pet` | 啟動小克（在背景執行，馬上回到命令列）。Claude Code 開始工作時，hooks 也會自動把它叫出來 |
+| `claude-pet stop` | 請小克結束（也可以右鍵選「關閉」） |
+| `claude-pet doctor` | 檢查環境，回報哪裡不對（Python、tkinter、Pillow、`claude` 指令、hooks 有沒有裝好） |
+| `claude-pet run` | 在前景執行；沒反應時用它看錯誤訊息 |
+
+同一時間只會有一隻：再啟動一次會直接結束。
+
+### 解除安裝
+
+```powershell
+claude-pet uninstall            # 移除 hooks 與捷徑、關掉執行中的小克（保留你的設定）
+claude-pet uninstall --purge    # 連設定與快取一起刪掉
+pip uninstall claude-pet
+```
+
+`uninstall` 只會移除 `install` 加進去的 hooks，其他設定不動，同樣會先備份。
+
+### 設定檔與資料放哪裡
+
+使用者資料放在 `%APPDATA%\claude-pet\`（`config.json`、`state.json`、`quota.json`、`icon.ico`），不放在程式旁邊，所以升級或重裝不會弄丟設定。
+備份檔在 `~\.claude\` 底下，檔名像 `settings.json.claude-pet-20261002-143045.bak`。
 
 ## 它長什麼樣、會做什麼
 
@@ -31,89 +78,7 @@
   - 最後是「關閉」
   - 帶 ▸ 的列，游標停上去就像 Windows 選單一樣在右側飛出子選單（靠近螢幕右緣時改在左側）。
 - **設定視窗**：語言（English／繁體中文，預設英文）、大小、自動出現、重設位置。
-- **可拖動**：拖到螢幕上任何位置，位置會記住。
-
-## 需求
-
-- Windows（視窗透明與永遠置頂用到 Windows 的功能）
-- Python 3，且含 `tkinter`（官方安裝程式預設就有；開發時用的是 Python 3.14）
-- [Pillow](https://pypi.org/project/pillow/)：`pip install pillow`
-- 中文字型「微軟正黑體」與彩色圖示字型「Segoe UI Emoji」（Windows 內建）
-
-## 使用方式
-
-### 手動啟動
-
-```powershell
-pythonw pet.py
-```
-
-用 `pythonw` 才不會多出一個黑色主控台視窗。同一時間只會有一隻：再執行一次會直接結束。
-
-### 桌面捷徑
-
-建立一個指向 `pythonw.exe` 的捷徑即可：
-
-- 目標：`<pythonw.exe 的路徑>`
-- 參數：`"<專案路徑>\pet.py"`
-- 起始位置：`<專案路徑>`
-- 圖示：`<專案路徑>\assets\icon.ico`
-
-也可以用 PowerShell 建立（把三個路徑換成你的）：
-
-```powershell
-$proj = "C:\path\to\claude-pet"
-$sh = New-Object -ComObject WScript.Shell
-$lnk = $sh.CreateShortcut([Environment]::GetFolderPath("Desktop") + "\Claude 小克.lnk")
-$lnk.TargetPath = "C:\path\to\pythonw.exe"
-$lnk.Arguments = "`"$proj\pet.py`""
-$lnk.WorkingDirectory = $proj
-$lnk.IconLocation = "$proj\assets\icon.ico,0"
-$lnk.WindowStyle = 7
-$lnk.Save()
-```
-
-### 接上 Claude Code（讓它跟著 Claude 動）
-
-寵物靠 Claude Code 的 hooks（官方文件有說明）取得狀態。
-`hook.py` 會在每個事件發生時被呼叫，把狀態寫進 `state.json`，寵物每 0.2 秒讀一次；
-寵物沒在跑時，`hook.py` 也會順便把它叫出來。
-
-在 `~/.claude/settings.json`（Windows 為 `C:\Users\<你>\.claude\settings.json`）加入 `hooks` 區塊，
-每個事件都執行同一個指令。把路徑換成你自己的 Python 與專案位置：
-
-```json
-{
-  "hooks": {
-    "SessionStart":       [{ "hooks": [{ "type": "command", "command": "\"C:/path/to/python.exe\" \"C:/path/to/claude-pet/hook.py\"" }] }],
-    "UserPromptSubmit":   [{ "hooks": [{ "type": "command", "command": "\"C:/path/to/python.exe\" \"C:/path/to/claude-pet/hook.py\"" }] }],
-    "PreToolUse":         [{ "matcher": "*", "hooks": [{ "type": "command", "command": "\"C:/path/to/python.exe\" \"C:/path/to/claude-pet/hook.py\"" }] }],
-    "PostToolUse":        [{ "matcher": "*", "hooks": [{ "type": "command", "command": "\"C:/path/to/python.exe\" \"C:/path/to/claude-pet/hook.py\"" }] }],
-    "PostToolUseFailure": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "\"C:/path/to/python.exe\" \"C:/path/to/claude-pet/hook.py\"" }] }],
-    "Notification":       [{ "hooks": [{ "type": "command", "command": "\"C:/path/to/python.exe\" \"C:/path/to/claude-pet/hook.py\"" }] }],
-    "Stop":               [{ "hooks": [{ "type": "command", "command": "\"C:/path/to/python.exe\" \"C:/path/to/claude-pet/hook.py\"" }] }]
-  }
-}
-```
-
-事件與動作的對應：
-
-| Claude Code 事件 | 寵物的狀態 |
-|---|---|
-| `UserPromptSubmit`、`PostToolUse` | 思考 |
-| `PreToolUse`（讀檔、搜尋類工具） | 拿放大鏡 |
-| `PreToolUse`（其他工具） | 敲鍵盤 |
-| `PostToolUseFailure` | 眩暈 2 秒後回到思考 |
-| `Notification` | 揮手要你注意 |
-| `Stop` | 開心跳躍 4 秒後回到平常 |
-| `SessionStart` | 打招呼 |
-
-`hook.py` 不輸出任何東西、永遠以 0 結束，出錯也不會影響 Claude Code。
-
-> 已驗證：在 VS Code 擴充功能版的 Claude Code 裡，`PreToolUse` / `PostToolUse` 會正常觸發，
-> 寵物會跟著做出敲鍵盤、思考等動作。其餘事件（`UserPromptSubmit`、`Stop`、`Notification`、
-> `PostToolUseFailure`、`SessionStart`）設定方式相同，但各自的實際表現請自行留意。
-> 若 hooks 沒有生效，先確認 `settings.json` 的路徑正確，並重新開啟對話。
+- **可拖動**：拖到螢幕上任何位置（包含副螢幕），位置會記住。
 
 ## 跟小克聊天、選模型、看配額
 
@@ -128,53 +93,102 @@ $lnk.Save()
 - **模型**：視窗左上的模型按鈕（或右鍵選單的「模型 ▸」）。
   對話中途切換也行，之後的回覆就用新模型。「預設」是依 Claude Code 的設定檔決定。
   可選的有 Fable 5.1、Opus 5.5、Sonnet 5.5、Haiku 4.5；你的帳號用不了的模型（例如需要額外儲值的）會直接顯示 CLI 回的錯誤訊息。
-- **工作資料夾**：視窗上的 📁 可以換，預設是小克自己的專案資料夾；換了會開新對話。「新對話」清掉目前的內容。
+- **工作資料夾**：視窗上的資料夾按鈕可以換，預設是你的使用者資料夾；換了會開新對話。「新對話」清掉目前的內容。
 - **配額**：視窗上方兩條進度條是 5 小時與每週的使用率（附重置時間），每輪回覆結束自動更新。
   快速點兩下小克，或右鍵選「配額」，會用泡泡報一次；資料超過 2 分鐘就先查一次，
   查詢用的是極簡的一次呼叫（約 800 tokens），幾乎不耗額度。結果快取在 `quota.json`。
 - 視窗下方的狀態列會顯示「思考中…」「使用 PowerShell…」「等你批准…」。
 - 關掉視窗只是收起來，對話還在；結束小克時對話行程會一併結束。
 - 對話期間小克的動作由對話本身直接驅動（思考、敲鍵盤、放大鏡、等你批准、做完開心跳），
-  這些對話行程不會再觸發 `hook.py`（它們帶有 `CLAUDE_PET_CHILD` 環境變數），避免重複。
+  這些對話行程不會再觸發 hook（它們帶有 `CLAUDE_PET_CHILD` 環境變數），避免重複。
 
 ## 設定（`config.json`）
 
-由寵物自動維護，也可以手動編輯（先結束寵物再改）：
+在 `%APPDATA%\claude-pet\config.json`，由寵物自動維護，也可以手動編輯（先結束寵物再改）：
 
 | 欄位 | 說明 | 預設 |
 |---|---|---|
 | `scale` | 大小：`0.6` 小、`0.8` 中、`1.0` 大、`1.3` 特大（在設定視窗改） | `0.8` |
 | `lang` | 介面語言：`en` 英文、`zh` 繁體中文（在設定視窗改） | `en` |
-| `x`、`y` | 視窗位置（拖動後自動記錄） | 螢幕右下角 |
-| `disabled` | `true` 時 `hook.py` 不會在寵物沒開時自動叫出它（已經開著的仍會跟著動） | `false` |
+| `x`、`y` | 視窗位置（拖動後自動記錄） | 主螢幕右下角 |
+| `disabled` | `true` 時 hook 不會在寵物沒開時自動叫出它（已經開著的仍會跟著動） | `false` |
 | `chat_model` | 對話用的模型 ID；`null` 為依 Claude Code 設定 | `null` |
-| `chat_cwd` | 對話的工作資料夾（可在視窗上換） | 專案資料夾 |
+| `chat_cwd` | 對話的工作資料夾（可在視窗上換） | 使用者資料夾 |
 | `chat_x`、`chat_y`、`chat_size` | 對話視窗的位置與大小（拖動、拉伸後自動記錄） | 小克旁邊、460×660 |
 | `claude_path` | 找不到 `claude` 指令時，手動指定它的完整路徑 | 自動尋找 |
 
+## 手動設定 hooks（不想用 `claude-pet install` 時）
+
+寵物靠 Claude Code 的 hooks 取得狀態。`python -m claude_pet.hook` 會在每個事件發生時被呼叫，把狀態寫進 `state.json`，寵物每 0.2 秒讀一次；
+寵物沒在跑時，它也會順便把寵物叫出來。它不輸出任何東西、永遠以 0 結束，出錯也不會影響 Claude Code。
+
+在 `~/.claude/settings.json` 的 `hooks` 區塊，下面這些事件都執行同一個指令：
+
+| Claude Code 事件 | 要不要 `matcher` | 寵物的狀態 |
+|---|---|---|
+| `UserPromptSubmit`、`PostToolUse` | `PostToolUse` 要（`"*"`） | 思考 |
+| `PreToolUse`（讀檔、搜尋類工具） | 要（`"*"`） | 拿放大鏡 |
+| `PreToolUse`（其他工具） | 要（`"*"`） | 敲鍵盤 |
+| `PostToolUseFailure` | 要（`"*"`） | 眩暈 2 秒後回到思考 |
+| `Notification` | 不用 | 揮手要你注意 |
+| `Stop` | 不用 | 開心跳躍 4 秒後回到平常 |
+| `SessionStart` | 不用 | 打招呼 |
+
+指令長這樣（換成你自己的 `python.exe` 完整路徑，一定要是裝了 claude-pet 的那個 Python）：
+
+```json
+{ "type": "command", "command": "C:/path/to/python.exe -m claude_pet.hook" }
+```
+
+**路徑不要加引號。** Claude Code 在 Windows 上執行 hook 的 shell 不固定（有的環境是 bash，有的是 PowerShell），
+「加引號的路徑接參數」在 PowerShell 會語法錯誤，不加引號兩邊都能跑。路徑含空白時，用 `dir /x` 查出 8.3 短路徑來用。
+`claude-pet install` 已經幫你處理好這件事了。
+
+## 疑難排解
+
+先跑 `claude-pet doctor`，它會逐項檢查並告訴你哪裡不對。
+
+- **寵物沒出現**：`claude-pet run`（前景執行，錯誤訊息會印出來）。
+- **hooks 沒有生效**：確認 `claude-pet doctor` 顯示 hooks 已設定，並且是在 `install` 之後新開的 Claude Code 對話。
+- **跑去別的螢幕或不見了**：右鍵選「設定…」→「重設位置」，或刪除 `config.json` 的 `x`、`y`。
+- **不想要它自動跳出來**：在設定視窗把「自動出現」切成關，或把 `config.json` 的 `disabled` 設為 `true`。
+- **聊天沒反應或顯示找不到 claude 指令**：先在終端機確認 `claude --version` 能執行，必要時在 `config.json` 設 `claude_path`。
+- **想完全關掉**：右鍵選「關閉」或 `claude-pet stop`。
+
 ## 開發
 
-沒有建置步驟，改完 `pet.py` 重新啟動即可。兩個預覽指令不會開視窗，適合調整畫面時使用：
+```powershell
+git clone https://github.com/<帳號>/claude-pet
+cd claude-pet
+pip install -e .          # 可編輯安裝：改程式立刻生效
+claude-pet doctor
+python -m claude_pet run  # 前景執行
+```
+
+沒有建置步驟。三個預覽指令不會開視窗，適合調整畫面時使用：
 
 ```powershell
-python pet.py --sheet sheet.png      # 所有動作的影格排成一張圖
-python pet.py --ui-sheet ui.png      # 對話泡泡與右鍵選單（深色與淺色背景）
-python pet.py --icon assets/icon.ico # 重新產生捷徑用的圖示
+claude-pet dev sheet sheet.png        # 所有動作的影格排成一張圖
+claude-pet dev ui-sheet ui.png        # 對話泡泡與右鍵選單（深色與淺色背景）
+claude-pet dev icon icon.ico          # 重新產生捷徑用的圖示
 ```
+
+專案根目錄的 `hook.py` 只是相容舊版設定的轉接檔（舊版 README 教大家在 settings.json 直接呼叫它）；`claude-pet install` 會把舊的設定換成新的。
 
 ### 檔案
 
 | 檔案 | 用途 |
 |---|---|
-| `pet.py` | 寵物本體：繪圖、動作、對話泡泡、右鍵選單、視窗 |
-| `chat.py` | 對話功能：`claude` 子行程（Session）、配額、對話視窗、與小克的橋接 |
-| `settings.py` | 設定視窗：語言、大小、自動出現、重設位置 |
-| `widgets.py` | 手繪風共用元件：按鈕、捲軸、視窗底圖、配色（對話與設定視窗共用） |
-| `i18n.py` | 介面文字（英文／繁體中文）；要加語言就在這裡加一份字串表 |
-| `hook.py` | 給 Claude Code hooks 呼叫：寫入狀態、必要時啟動寵物 |
-| `state.json` | 目前狀態（執行時產生，不納入版本控制） |
-| `config.json` | 個人偏好（不納入版本控制） |
-| `quota.json` | 最近一次的配額快取（不納入版本控制） |
+| `claude_pet/pet.py` | 寵物本體：繪圖、動作、對話泡泡、右鍵選單、視窗 |
+| `claude_pet/chat.py` | 對話功能：`claude` 子行程（Session）、配額、對話視窗、與小克的橋接 |
+| `claude_pet/settings.py` | 設定視窗：語言、大小、自動出現、重設位置 |
+| `claude_pet/widgets.py` | 手繪風共用元件：按鈕、捲軸、視窗底圖、配色（對話與設定視窗共用） |
+| `claude_pet/i18n.py`、`cli_text.py` | 介面文字（英文／繁體中文）；要加語言就在這裡加一份字串表 |
+| `claude_pet/screens.py` | 多螢幕：查詢座標所在螢幕的工作區 |
+| `claude_pet/hook.py` | 給 Claude Code hooks 呼叫：寫入狀態、必要時啟動寵物（只用標準函式庫，要很輕） |
+| `claude_pet/installer.py` | `install`／`uninstall`／`doctor` |
+| `claude_pet/cli.py` | 命令列入口（`claude-pet`） |
+| `claude_pet/paths.py` | 檔案位置（資料夾、埠）；環境變數 `CLAUDE_PET_HOME`、`CLAUDE_PET_PORT`、`CLAUDE_CONFIG_DIR` 可以覆寫，測試用 |
 
 ### 運作方式
 
@@ -186,13 +200,5 @@ python pet.py --icon assets/icon.ico # 重新產生捷徑用的圖示
 - 多螢幕：位置一律以 Windows 的螢幕工作區（扣掉工作列）計算（`screens.py`），不是只看主螢幕。
   小克會記住你放在哪個螢幕；選單、飛出的子選單、設定視窗都留在小克／游標所在的螢幕，
   靠近螢幕邊緣時會往內縮或翻向另一側；對話視窗在小克換螢幕後再打開，會跟到小克旁邊。
-- 單一實例：寵物啟動時綁住本機的 `47651` 埠當作鎖，`hook.py` 也靠連線這個埠判斷寵物有沒有在跑。
+- 單一實例：寵物啟動時綁住本機的 `47651` 埠當作鎖，hook 靠連線這個埠判斷寵物有沒有在跑，`claude-pet stop` 也是連上去送一個 `quit`。
 - 狀態過期保護：思考、工作、等待回覆的狀態超過一段時間沒有新事件，會自動回到平常，避免因為中斷而卡住。
-
-## 疑難排解
-
-- **寵物沒出現**：確認 `pip install pillow`；改用 `python pet.py`（有主控台）啟動，錯誤訊息會印出來。
-- **跑去別的螢幕或不見了**：右鍵選「重設位置」，或刪除 `config.json` 的 `x`、`y`。
-- **不想要它自動跳出來**：在設定視窗把「自動出現」切成關，或把 `config.json` 的 `disabled` 設為 `true`。
-- **聊天沒反應或顯示「找不到 claude 指令」**：先在終端機確認 `claude --version` 能執行，必要時在 `config.json` 設 `claude_path`。
-- **想完全關掉**：右鍵選「關閉」，或在工作管理員結束 `pythonw.exe`。
