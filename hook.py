@@ -74,11 +74,13 @@ def main():
         cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
     except Exception:
         cfg = {}
-    if cfg.get("disabled"):
-        return
-
     payload = decide(ev)
     if payload is None:
+        return
+
+    running = is_running()
+    # 關閉「自動出現」只代表不主動叫出寵物；已經開著的寵物仍然要跟著動
+    if cfg.get("disabled") and not running:
         return
 
     payload["at"] = time.time()
@@ -86,7 +88,7 @@ def main():
     tmp.write_text(json.dumps(payload), encoding="utf-8")
     os.replace(tmp, STATE)
 
-    if not is_running():
+    if not running:
         launch()
 
 
