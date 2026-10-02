@@ -7,7 +7,7 @@
     t("bubble.happy")                   → 清單型（隨機挑一句用）
 """
 
-LANGS = [("en", "English"), ("zh", "繁體中文")]
+LANGS = [("en", "English"), ("zh", "繁體中文"), ("zh-CN", "简体中文")]
 DEFAULT = "en"
 _lang = DEFAULT
 
@@ -186,6 +186,95 @@ STR = {
     },
 }
 
+# 简体中文（大陆用语）。语言代码 zh-CN；zh 仍然是繁體中文（旧的 config.json 里存的就是 zh）。
+STR["zh-CN"] = {
+    "name": "小克",
+    "bubble.happy": ["做好了！", "搞定～", "好耶～", "任务完成"],
+    "bubble.attention": ["需要你看一下！", "轮到你了～", "等你回复哦"],
+    "bubble.error": ["哎呀…", "晕了晕了…"],
+    "bubble.petted": ["嘿嘿～", "好舒服", "再摸一下嘛", "痒痒的～"],
+    "bubble.wake": ["嗯？"],
+    "bubble.auto_off": "不会再自动出现了",
+    "bubble.auto_on": "我会自动出现啦",
+    "bubble.switched": "换成 {model}",
+    "bubble.checking": "正在查询配额…",
+    "bubble.no_usage": "查不到配额",
+
+    "section.chat": "对话",
+    "section.pet": "小克",
+    "menu.chat": "跟小克聊天",
+    "menu.quota": "配额",
+    "menu.model": "模型",
+    "menu.actions": "动作",
+    "menu.settings": "设置…",
+    "menu.close": "关闭",
+    "act.pet": "摸摸",
+    "act.sleep": "睡觉",
+    "act.wake": "叫醒",
+    "act.happy": "开心跳",
+    "act.think": "思考",
+    "act.type": "敲键盘",
+    "act.search": "放大镜",
+    "act.dizzy": "眩晕",
+    "act.wave": "招手",
+
+    "settings.title": "设置",
+    "settings.subtitle": "调成你喜欢的样子",
+    "settings.language": "语言",
+    "settings.size": "大小",
+    "settings.auto": "自动出现",
+    "settings.auto_desc": "Claude Code 开始工作时，自动把小克叫出来",
+    "settings.position": "位置",
+    "settings.reset_pos": "重置位置",
+    "settings.on": "开",
+    "settings.off": "关",
+    "size.0.6": "小",
+    "size.0.8": "中",
+    "size.1.0": "大",
+    "size.1.3": "特大",
+
+    "model.default": "默认（依 Claude Code 设置）",
+    "model.default_short": "默认",
+    "quota.five_hour": "5 小时",
+    "quota.seven_day": "本周",
+    "quota.none": "暂无数据",
+    "quota.no_usage_yet": "还没有配额数据",
+    "quota.short": "5 小时 {a}・本周 {b}",
+    "reset.done": "已重置",
+    "reset.dh": "{d} 天 {h} 小时后重置",
+    "reset.hm": "{h} 小时 {m} 分钟后重置",
+    "reset.m": "{m} 分钟后重置",
+
+    "chat.subtitle": "来聊聊吧",
+    "chat.new": "新对话",
+    "chat.folder": "文件夹：{name}",
+    "chat.send": "发送",
+    "chat.stop": "停止",
+    "chat.allow": "允许",
+    "chat.allow_always": "本次都允许",
+    "chat.deny": "拒绝",
+    "chat.you": "你",
+    "chat.perm": "Claude 想使用工具：{tool}{more}",
+    "chat.perm_more": "（还有 {n} 个在排队）",
+    "chat.pick_folder": "选择 Claude 的工作文件夹",
+    "status.thinking": "思考中",
+    "status.waiting": "等你批准",
+    "status.using": "使用 {name}",
+
+    "note.connected": "连接完成，使用模型 {model}",
+    "note.tool_failed": "⚠ 工具失败：{err}",
+    "note.exited": "claude 已退出（代码 {code}）{stderr}",
+    "note.stopping": "已请求停止…",
+    "note.model_switched": "之后的回复改用 {model}",
+    "note.folder_switched": "已切换到文件夹 {path}，开始新对话",
+    "note.new_chat": "开始新对话",
+    "note.no_claude": "找不到 claude 命令。请先安装 Claude Code，或在 config.json 里设置 claude_path。",
+    "note.start_failed": "无法启动 claude：{err}",
+    "note.connection_lost": "与 claude 的连接中断了",
+    "note.reply_failed": "回复失败",
+}
+
+
 
 def set_lang(code):
     global _lang
@@ -209,3 +298,4 @@ from . import cli_text  # noqa: E402
 
 STR["en"].update(cli_text.EN)
 STR["zh"].update(cli_text.ZH)
+STR["zh-CN"].update(cli_text.ZH_CN)

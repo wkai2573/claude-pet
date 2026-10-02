@@ -79,7 +79,7 @@ pip uninstall claude-pet
   - 小克：**動作 ▸**（摸摸、睡覺或叫醒、開心跳、思考、敲鍵盤、放大鏡、眩暈、招手）、**設定…**（開啟設定視窗）
   - 最後是「關閉」
   - 帶 ▸ 的列，游標停上去就像 Windows 選單一樣在右側飛出子選單（靠近螢幕右緣時改在左側）。
-- **設定視窗**：語言（English／繁體中文，預設英文）、大小、自動出現、重設位置。
+- **設定視窗**：語言（English／繁體中文／简体中文，預設英文）、大小、自動出現、重設位置。
 - **可拖動**：拖到螢幕上任何位置（包含副螢幕），位置會記住。
 
 ## 跟小克聊天、選模型、看配額
@@ -111,7 +111,7 @@ pip uninstall claude-pet
 | 欄位 | 說明 | 預設 |
 |---|---|---|
 | `scale` | 大小：`0.6` 小、`0.8` 中、`1.0` 大、`1.3` 特大（在設定視窗改） | `0.8` |
-| `lang` | 介面語言：`en` 英文、`zh` 繁體中文（在設定視窗改） | `en` |
+| `lang` | 介面語言：`en` 英文、`zh` 繁體中文、`zh-CN` 簡體中文（在設定視窗改） | `en` |
 | `x`、`y` | 視窗位置（拖動後自動記錄） | 主螢幕右下角 |
 | `disabled` | `true` 時 hook 不會在寵物沒開時自動叫出它（已經開著的仍會跟著動） | `false` |
 | `chat_model` | 對話用的模型 ID；`null` 為依 Claude Code 設定 | `null` |
@@ -185,7 +185,7 @@ claude-pet dev icon icon.ico          # 重新產生捷徑用的圖示
 | `claude_pet/chat.py` | 對話功能：`claude` 子行程（Session）、配額、對話視窗、與小克的橋接 |
 | `claude_pet/settings.py` | 設定視窗：語言、大小、自動出現、重設位置 |
 | `claude_pet/widgets.py` | 手繪風共用元件：按鈕、捲軸、視窗底圖、配色（對話與設定視窗共用） |
-| `claude_pet/i18n.py`、`cli_text.py` | 介面文字（英文／繁體中文）；要加語言就在這裡加一份字串表 |
+| `claude_pet/i18n.py`、`cli_text.py` | 介面文字（英文／繁體中文／簡體中文）；要加語言就在這裡加一份字串表 |
 | `claude_pet/screens.py` | 多螢幕：查詢座標所在螢幕的工作區 |
 | `claude_pet/hook.py` | 給 Claude Code hooks 呼叫：寫入狀態、必要時啟動寵物（只用標準函式庫，要很輕） |
 | `claude_pet/installer.py` | `install`／`uninstall`／`doctor` |

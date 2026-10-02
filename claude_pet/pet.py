@@ -519,7 +519,8 @@ def make_sheet(path):
 
 # ───────────────────────── 對話泡泡與右鍵選單（低調、半透明的手繪風） ─────────────────────────
 
-FONT_TEXT = "C:/Windows/Fonts/msjhbd.ttc"  # 微軟正黑體 粗體
+FONT_TEXT = "C:/Windows/Fonts/msjhbd.ttc"  # 微軟正黑體 粗體（英文、繁體中文）
+FONT_TEXT_CN = "C:/Windows/Fonts/msyhbd.ttc"  # 微軟雅黑 粗體（簡體中文：簡繁共用字的字形用大陸寫法）
 FONT_EMOJI = "C:/Windows/Fonts/seguiemj.ttf"  # 彩色圖示
 INK = (70, 52, 46, 255)  # 比角色的黑框淺一點，對話框才不會搶戲
 LINE = (84, 64, 58, 255)
@@ -538,8 +539,15 @@ def get_font(path, size):
     return _fonts[key]
 
 
+def text_font():
+    """目前語言該用的文字字型；簡體中文優先用微軟雅黑，沒有這個字型就退回正黑體。"""
+    if i18n.get_lang() == "zh-CN" and Path(FONT_TEXT_CN).exists():
+        return FONT_TEXT_CN
+    return FONT_TEXT
+
+
 def text_width(s, px):
-    f = get_font(FONT_TEXT, round(px * SS))
+    f = get_font(text_font(), round(px * SS))
     box = f.getbbox(s)
     return (box[2] - box[0]) / SS
 
@@ -549,7 +557,7 @@ def put_text(pen, x, y, s, px, fill, emoji=False):
     if emoji:
         pen.d.text((x * pen.k, y * pen.k), s, font=get_font(FONT_EMOJI, round(px * pen.k)), embedded_color=True)
     else:
-        pen.d.text((x * pen.k, y * pen.k), s, font=get_font(FONT_TEXT, round(px * pen.k)), fill=fill)
+        pen.d.text((x * pen.k, y * pen.k), s, font=get_font(text_font(), round(px * pen.k)), fill=fill)
 
 
 # 泡泡種類：淡淡的底色與小圖示

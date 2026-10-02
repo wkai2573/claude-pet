@@ -80,7 +80,7 @@ Also:
   - Pet: **Actions ▸** (Pet me, Sleep / Wake up, Celebrate, Think, Type, Search, Dizzy, Wave) and **Settings…** (opens the settings window)
   - And "Close" at the end
   - Rows with ▸ fly out a submenu to the right when you hover over them, like a Windows menu (to the left when you're near the right edge of the screen).
-- **Settings window**: language (English / 繁體中文, English by default), size, auto-appear, reset position.
+- **Settings window**: language (English / 繁體中文 / 简体中文, English by default), size, auto-appear, reset position.
 - **Draggable**: drag it anywhere on screen, including a second monitor; the position is remembered.
 
 ## Chat, model and usage
@@ -110,7 +110,7 @@ Lives in `%APPDATA%\claude-pet\config.json`. The pet maintains it automatically;
 | Field | Meaning | Default |
 |---|---|---|
 | `scale` | Size: `0.6` S, `0.8` M, `1.0` L, `1.3` XL (change it in the settings window) | `0.8` |
-| `lang` | UI language: `en` English, `zh` 繁體中文 (change it in the settings window) | `en` |
+| `lang` | UI language: `en` English, `zh` 繁體中文, `zh-CN` 简体中文 (change it in the settings window) | `en` |
 | `x`, `y` | Window position (recorded when you drag it) | bottom right of the main screen |
 | `disabled` | When `true`, the hook won't bring the pet up if it isn't running (an already running pet still follows along) | `false` |
 | `chat_model` | Model ID used for chat; `null` follows your Claude Code settings | `null` |
@@ -183,7 +183,7 @@ The `hook.py` in the repository root is only a compatibility shim for the old se
 | `claude_pet/chat.py` | Chat: the `claude` subprocess (Session), usage quota, chat window, and the bridge to the pet |
 | `claude_pet/settings.py` | Settings window: language, size, auto-appear, reset position |
 | `claude_pet/widgets.py` | Shared hand-drawn pieces: buttons, scrollbar, window backdrop, colors (used by the chat and settings windows) |
-| `claude_pet/i18n.py`, `cli_text.py` | UI text (English / 繁體中文); add a language by adding another string table here |
+| `claude_pet/i18n.py`, `cli_text.py` | UI text (English / 繁體中文 / 简体中文); add a language by adding another string table here |
 | `claude_pet/screens.py` | Multi-monitor support: find the work area of the screen containing a point |
 | `claude_pet/hook.py` | Called by Claude Code hooks: writes the state and starts the pet if needed (standard library only, must stay light) |
 | `claude_pet/installer.py` | `install` / `uninstall` / `doctor` |
