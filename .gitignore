@@ -1,6 +1,7 @@
 # 執行時產生或屬於個人偏好
 state.json
 config.json
+quota.json
 
 # Python
 __pycache__/

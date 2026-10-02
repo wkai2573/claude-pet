@@ -18,6 +18,8 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageTk
 
+import chat
+
 HERE = Path(__file__).resolve().parent
 STATE = HERE / "state.json"
 CONFIG = HERE / "config.json"
@@ -762,6 +764,8 @@ class Pet:
         c.bind("<Button-3>", self.show_menu)
         self.drag = None
         self.moved = False
+        self.last_click = 0.0
+        self.chat = chat.Chat(self)
 
         self.read_state()
         self.tick()
@@ -796,6 +800,9 @@ class Pet:
         self.scale = nxt
         self.layout()
 
+    def save_cfg(self):
+        save_config(self.cfg)
+
     def toggle_auto(self):
         self.cfg["disabled"] = not self.cfg.get("disabled", False)
         save_config(self.cfg)
@@ -807,6 +814,9 @@ class Pet:
             self.menu.close()
         auto_on = not self.cfg.get("disabled", False)
         items = [
+            dict(icon="💬", label="跟小克聊天", cb=self.chat.open),
+            dict(icon="📊", label="配額", cb=self.chat.show_quota),
+            dict(icon="🧠", label="模型：" + chat.model_label(self.chat.model).split("（")[0], cb=self.chat.cycle_model),
             dict(icon="💖", label="摸摸", cb=self.pet_it),
             dict(icon="😴", label="叫醒" if self.mode == "sleep" else "睡覺", cb=self.toggle_sleep),
             dict(icon="📍", label="重設位置", cb=self.reset_pos),
@@ -838,7 +848,13 @@ class Pet:
             self.cfg["x"], self.cfg["y"] = self.root.winfo_x(), self.root.winfo_y()
             save_config(self.cfg)
         else:
-            self.pet_it()
+            now = time.time()
+            if now - self.last_click < 0.45:  # 快速點兩下：報配額
+                self.last_click = 0.0
+                self.chat.show_quota()
+            else:
+                self.last_click = now
+                self.pet_it()
         self.drag = None
 
     # —— 互動 ——
@@ -1002,8 +1018,9 @@ def main():
         return  # 已經有一隻在跑了
     root = tk.Tk()
     root.title("Claude 小克")
-    Pet(root)
+    pet = Pet(root)
     root.mainloop()
+    pet.chat.close()
     lock.close()
 
 

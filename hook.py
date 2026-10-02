@@ -74,6 +74,9 @@ def main():
         cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
     except Exception:
         cfg = {}
+    if os.environ.get("CLAUDE_PET_CHILD"):
+        return  # 小克自己開的對話，動作由 chat.py 直接驅動，不必再經過 hook
+
     payload = decide(ev)
     if payload is None:
         return
