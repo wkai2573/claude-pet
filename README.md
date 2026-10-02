@@ -36,6 +36,7 @@ After installing, **open a new Claude Code conversation** (or restart the curren
 | `claude-pet` | Start the pet (runs in the background and returns to the prompt). The hooks also bring it up automatically when Claude Code starts working |
 | `claude-pet stop` | Ask the pet to quit (or right-click it and choose "Close") |
 | `claude-pet doctor` | Check your environment and report what's wrong (Python, tkinter, Pillow, the `claude` command, whether the hooks are set up) |
+| `claude-pet update` | Check for a new version, show what's new, and update (`--check` only looks, `-y` skips the confirmation) |
 | `claude-pet run` | Run in the foreground; use it to see error messages if nothing shows up |
 
 Only one pet runs at a time: starting it again just exits.
@@ -50,6 +51,17 @@ pip uninstall claude-pet
 
 `uninstall` only removes the hooks that `install` added, leaves everything else alone, and backs up first as well.
 
+### Updates
+
+The pet checks GitHub once a day in the background (no network: it silently skips). When a new version is out:
+
+- the pet pops up a bubble, and the right-click menu gets an **Update to vX.Y.Z** item at the top;
+- click it to read **what's new** (the release notes) first, then choose **Update now**, **Later** or **Skip this version**;
+- **Update now** does the rest: the pet quits, pip upgrades claude-pet, the hooks are re-synced, and the pet comes back (a bubble tells you it worked; if anything goes wrong the old version comes back and the details are in `%APPDATA%\claude-pet\update.log`).
+
+Prefer the command line? `claude-pet update` shows the release notes and asks before installing; `claude-pet update --check` only looks.
+Don't want reminders? Turn **Updates** off in the settings window (you can still press **Check now**).
+Updating doesn't need git. A source checkout (`pip install -e .`) never updates itself; it only reminds you to run `git pull`.
 ### Where your data lives
 
 User data is stored in `%APPDATA%\claude-pet\` (`config.json`, `state.json`, `quota.json`, `icon.ico`), not next to the program, so upgrading or reinstalling never loses your settings.
@@ -80,7 +92,7 @@ Also:
   - Pet: **Actions ▸** (Pet me, Sleep / Wake up, Celebrate, Think, Type, Search, Dizzy, Wave) and **Settings…** (opens the settings window)
   - And "Close" at the end
   - Rows with ▸ fly out a submenu to the right when you hover over them, like a Windows menu (to the left when you're near the right edge of the screen).
-- **Settings window**: language (English / 繁體中文 / 简体中文, English by default), size, auto-appear, reset position.
+- **Settings window**: language (English / 繁體中文 / 简体中文, English by default), size, auto-appear, update reminders, reset position.
 - **Draggable**: drag it anywhere on screen, including a second monitor; the position is remembered.
 
 ## Chat, model and usage
@@ -111,6 +123,7 @@ Lives in `%APPDATA%\claude-pet\config.json`. The pet maintains it automatically;
 |---|---|---|
 | `scale` | Size: `0.6` S, `0.8` M, `1.0` L, `1.3` XL (change it in the settings window) | `0.8` |
 | `lang` | UI language: `en` English, `zh` 繁體中文, `zh-CN` 简体中文 (change it in the settings window) | `en` |
+| `update_check` | Check GitHub for new versions once a day and remind you (change it in the settings window) | `true` |
 | `x`, `y` | Window position (recorded when you drag it) | bottom right of the main screen |
 | `disabled` | When `true`, the hook won't bring the pet up if it isn't running (an already running pet still follows along) | `false` |
 | `chat_model` | Model ID used for chat; `null` follows your Claude Code settings | `null` |
@@ -175,6 +188,12 @@ claude-pet dev icon icon.ico          # regenerate the shortcut icon
 
 The `hook.py` in the repository root is only a compatibility shim for the old setup (earlier versions of this README told people to call it directly from settings.json); `claude-pet install` replaces old entries with the new form.
 
+### Releasing a new version
+
+1. Bump `__version__` in `claude_pet/__init__.py` (the only place; `pyproject.toml` reads it) and commit.
+2. Tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
+3. On GitHub, create a **Release** for that tag and write the notes. **That text is exactly what users read before they update.** Drafts and pre-releases are ignored.
+4. One-time setup: put your GitHub `owner/repo` in `REPO` at the top of `claude_pet/update.py`. Until then, update checking stays off.
 ### Files
 
 | File | Purpose |
@@ -187,6 +206,8 @@ The `hook.py` in the repository root is only a compatibility shim for the old se
 | `claude_pet/screens.py` | Multi-monitor support: find the work area of the screen containing a point |
 | `claude_pet/hook.py` | Called by Claude Code hooks: writes the state and starts the pet if needed (standard library only, must stay light) |
 | `claude_pet/installer.py` | `install` / `uninstall` / `doctor` |
+| `claude_pet/update.py` | Updates: check GitHub Releases, compare versions, the one-click updater (no Tk) |
+| `claude_pet/update_window.py` | Update reminders (scheduling, bubble, menu item) and the release-notes window |
 | `claude_pet/cli.py` | Command-line entry point (`claude-pet`) |
 | `claude_pet/paths.py` | File locations (data folder, port); the environment variables `CLAUDE_PET_HOME`, `CLAUDE_PET_PORT` and `CLAUDE_CONFIG_DIR` override them, for testing |
 

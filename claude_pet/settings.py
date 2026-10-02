@@ -1,4 +1,4 @@
-"""設定視窗：語言、大小、自動出現、重設位置。
+"""設定視窗：語言、大小、自動出現、更新提醒、重設位置。
 
 和對話視窗同一套手繪風（無系統標題列、可拖動標題列、右上角 × 關閉）。
 這個視窗只負責畫面與按鈕；真正改設定的是 Pet 的 set_language / set_scale / toggle_auto / reset_pos。
@@ -15,7 +15,7 @@ from .widgets import (ACCENT_HOVER, ACCENT_P, CREAM, DIMP, INKP, PAD, PILL, PILL
 W = 400
 SIZE_VALUES = [0.6, 0.8, 1.0, 1.3]
 WHITE = (255, 255, 255, 255)
-ROW_LANG, ROW_SIZE, ROW_AUTO, ROW_POS = 66, 112, 158, 242  # 每一列控制項的 y
+ROW_LANG, ROW_SIZE, ROW_AUTO, ROW_UPD, ROW_POS = 66, 112, 158, 242, 340  # 每一列控制項的 y
 H = ROW_POS + 28 + PAD + SHM + 6
 
 
@@ -64,9 +64,12 @@ class SettingsWindow:
         self.size_pills = [(v, self.pill(t(f"size.{v}"), lambda v=v: self.pick_size(v), min_w=44)) for v in SIZE_VALUES]
         self.auto_pill = self.pill("", pet.toggle_auto, min_w=64)
         self.pos_pill = self.pill(t("settings.reset_pos"), pet.reset_pos)
+        self.upd_pill = self.pill("", self.toggle_updates, min_w=64)
+        self.check_pill = self.pill(t("settings.check_now"), lambda: pet.update_mgr.check(manual=True))
         self.row(self.lang_pills, ROW_LANG)
         self.row(self.size_pills, ROW_SIZE)
         self.row([(0, self.auto_pill)], ROW_AUTO)
+        self.row([(0, self.upd_pill), (1, self.check_pill)], ROW_UPD)
         self.row([(0, self.pos_pill)], ROW_POS)
         self.refresh()
 
@@ -94,11 +97,16 @@ class SettingsWindow:
         k = 2
         pen = card_frame(kit, W, H, k, (4, 4, W - SHM, H - SHM), t("settings.title"), t("settings.subtitle"))
         L, R = self.L, self.R
-        for y, key in ((ROW_LANG, "language"), (ROW_SIZE, "size"), (ROW_AUTO, "auto"), (ROW_POS, "position")):
+        for y, key in ((ROW_LANG, "language"), (ROW_SIZE, "size"), (ROW_AUTO, "auto"), (ROW_UPD, "updates"), (ROW_POS, "position")):
             kit.put_text(pen, L, y + 5, t("settings." + key), 12.5, kit.INK)
         for i, line in enumerate(wrap(kit, t("settings.auto_desc"), 10.5, R - L)):
             kit.put_text(pen, L, ROW_AUTO + 36 + i * 16, line, 10.5, DIMP)
-        for y in (ROW_SIZE - 10, ROW_AUTO - 10, ROW_POS - 10):  # 列與列之間的虛線
+        lines = wrap(kit, t("settings.updates_desc"), 10.5, R - L)
+        for i, line in enumerate(lines):
+            kit.put_text(pen, L, ROW_UPD + 36 + i * 16, line, 10.5, DIMP)
+        mgr = self.pet.update_mgr  # 版本與有沒有新版：會隨檢查結果重畫
+        kit.put_text(pen, L, ROW_UPD + 36 + len(lines) * 16 + 2, mgr.status_text(), 10.5, ACCENT_P if mgr.pending() else kit.INK)
+        for y in (ROW_SIZE - 10, ROW_AUTO - 10, ROW_UPD - 10, ROW_POS - 10):  # 列與列之間的虛線
             for dx in range(L, R, 7):
                 pen.d.line([pen.p(dx, y), pen.p(dx + 3.5, y)], fill=SOFT_LINE, width=round(1.2 * k))
         return pen.im.resize((W, H), Image.LANCZOS)
@@ -117,10 +125,25 @@ class SettingsWindow:
         nearest = min(SIZE_VALUES, key=lambda v: abs(v - scale))
         for v, p in self.size_pills:
             self.style(p, v == nearest)
+        upd = self.pet.update_mgr.enabled()
+        self.upd_pill.fg = WHITE if upd else INKP
+        self.upd_pill.set_text(t("settings.on") if upd else t("settings.off"),
+                               ACCENT_P if upd else PILL, ACCENT_HOVER if upd else PILL_HOVER)
         on = not self.pet.cfg.get("disabled", False)
         self.auto_pill.fg = WHITE if on else INKP
         self.auto_pill.set_text(t("settings.on") if on else t("settings.off"),
                                 ACCENT_P if on else PILL, ACCENT_HOVER if on else PILL_HOVER)
+
+    def toggle_updates(self):
+        mgr = self.pet.update_mgr
+        mgr.set_enabled(not mgr.enabled())
+        self.refresh()
+
+    def refresh_status(self):
+        """更新狀態（檢查中、有新版…）變了：重畫底圖上那一行字。"""
+        self.bg_photo = self.kit.to_tk(self.render())
+        self.canvas.itemconfigure(self.bg_item, image=self.bg_photo)
+        self.canvas.tag_lower(self.bg_item)
 
     def pick_size(self, v):
         self.pet.set_scale(v)

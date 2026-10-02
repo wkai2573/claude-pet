@@ -36,11 +36,54 @@ def build_parser():
     un = sub.add_parser("uninstall", help="remove the hooks and shortcut")
     un.add_argument("--purge", action="store_true", help="also delete settings and cache in the data folder")
     un.add_argument("--dry-run", action="store_true", help="show what would be removed, change nothing")
+    up = sub.add_parser("update", help="check for a new version and update")
+    up.add_argument("--check", action="store_true", help="only check and show what's new, don't install")
+    up.add_argument("-y", "--yes", action="store_true", help="don't ask for confirmation")
     sub.add_parser("doctor", help="check the environment")
+    ap = sub.add_parser("_apply", help=argparse.SUPPRESS)  # 內部用：更新小幫手
+    ap.add_argument("tag")
     dev = sub.add_parser("dev", help=argparse.SUPPRESS)  # 開發用：輸出預覽圖
     dev.add_argument("what", choices=["sheet", "ui-sheet", "icon"])
     dev.add_argument("path")
     return p
+
+
+def _update(args):
+    from . import __version__, update
+
+    if not update.configured():
+        print(t("update.cli.unconfigured"))
+        return 1
+    res = update.check()
+    if res["status"] == "error":
+        print(t("update.cli.error", err=res["error"]))
+        return 1
+    if res["status"] != "available":
+        print(t("update.cli.latest", version=__version__))
+        return 0
+    info = res["latest"]
+    print(t("update.cli.available", latest=info["version"], current=__version__))
+    print()
+    print(t("update.cli.notes"))
+    print(info["notes"] or t("update.no_notes"))
+    print()
+    if args.check:
+        print(t("update.cli.hint"))
+        return 0
+    if update.is_source_checkout():
+        print(t("update.cli.dev"))
+        return 0
+    if not args.yes:
+        try:
+            if input(t("update.cli.confirm")).strip().lower() not in ("y", "yes"):
+                print(t("update.cli.cancelled"))
+                return 0
+        except EOFError:
+            print(t("update.cli.cancelled"))
+            return 0
+    update.spawn_apply(info["tag"])
+    print(t("update.cli.started", path=update.LOG_FILE))
+    return 0
 
 
 def main(argv=None):
@@ -78,6 +121,12 @@ def main(argv=None):
         from . import installer
 
         return installer.uninstall(purge=args.purge, dry_run=args.dry_run)
+    if cmd == "update":
+        return _update(args)
+    if cmd == "_apply":
+        from . import update
+
+        return update.apply_update(args.tag)
     if cmd == "doctor":
         from . import installer
 

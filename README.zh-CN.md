@@ -35,6 +35,7 @@ claude-pet install
 | `claude-pet` | 启动小克（在后台运行，立刻回到命令行）。Claude Code 开始工作时，hooks 也会自动把它叫出来 |
 | `claude-pet stop` | 请小克退出（也可以右键选择 “Close”（关闭）） |
 | `claude-pet doctor` | 检查环境，报告哪里有问题（Python、tkinter、Pillow、`claude` 命令、hooks 是否装好） |
+| `claude-pet update` | 检查有没有新版本、显示更新内容并更新（`--check` 只看不装，`-y` 不再询问） |
 | `claude-pet run` | 在前台运行；没有反应时用它查看错误信息 |
 
 同一时间只会有一只：再次启动会直接退出。
@@ -49,6 +50,17 @@ pip uninstall claude-pet
 
 `uninstall` 只会移除 `install` 添加的 hooks，其他设置不动，同样会先备份。
 
+### 更新
+
+小克每天会在后台检查一次 GitHub（没有网络就悄悄跳过）。有新版本时：
+
+- 小克会冒出一个气泡，右键菜单最上面多出一项 “**Update to vX.Y.Z**”（更新到 vX.Y.Z）；
+- 点进去会先显示**更新内容**（Release 的说明），再让你选 “**Update now**”（立即更新）、“**Later**”（以后再说）或 “**Skip this version**”（跳过这个版本）；
+- “Update now” 会帮你做完剩下的事：小克先关闭、pip 升级 claude-pet、同步 hooks、小克再回来（会用气泡告诉你成功了；如果中途出错，会回到原来的版本，详细记录在 `%APPDATA%\claude-pet\update.log`）。
+
+习惯用命令行？`claude-pet update` 会先显示更新内容、询问后再安装；`claude-pet update --check` 只看不装。
+不想被提醒？在设置窗口里把 “**Updates**”（更新）关掉（仍然可以按 “Check now”（立即检查））。
+更新不需要安装 git。从源码文件夹运行（`pip install -e .`）时不会自己更新，只会提醒你执行 `git pull`。
 ### 设置文件和数据放在哪里
 
 用户数据放在 `%APPDATA%\claude-pet\`（`config.json`、`state.json`、`quota.json`、`icon.ico`），不放在程序旁边，所以升级或重装不会丢失设置。
@@ -79,7 +91,7 @@ pip uninstall claude-pet
   - 小克：**Actions ▸**（动作：摸摸、睡觉或叫醒、开心跳、思考、敲键盘、放大镜、眩晕、招手）、**Settings…**（设置，打开设置窗口）
   - 最后是 “Close”（关闭）
   - 带 ▸ 的行，光标停上去就会像 Windows 菜单一样在右侧弹出子菜单（靠近屏幕右边缘时改在左侧）。
-- **设置窗口**：语言（English／繁體中文／简体中文，默认英文）、大小、自动出现、重置位置。
+- **设置窗口**：语言（English／繁體中文／简体中文，默认英文）、大小、自动出现、更新提醒、重置位置。
 - **可拖动**：拖到屏幕上任何位置（包括副屏），位置会被记住。
 
 ## 和小克聊天、选模型、查看配额
@@ -112,6 +124,7 @@ pip uninstall claude-pet
 |---|---|---|
 | `scale` | 大小：`0.6` 小、`0.8` 中、`1.0` 大、`1.3` 特大（在设置窗口里改） | `0.8` |
 | `lang` | 界面语言：`en` 英文、`zh` 繁体中文、`zh-CN` 简体中文（在设置窗口里改） | `en` |
+| `update_check` | 每天检查一次 GitHub 有没有新版本并提醒你（在设置窗口里改） | `true` |
 | `x`、`y` | 窗口位置（拖动后自动记录） | 主屏幕右下角 |
 | `disabled` | 为 `true` 时，hook 不会在宠物没开时自动把它叫出来（已经开着的仍会跟着动） | `false` |
 | `chat_model` | 聊天使用的模型 ID；`null` 表示依 Claude Code 的设置 | `null` |
@@ -177,6 +190,12 @@ claude-pet dev icon icon.ico          # 重新生成快捷方式用的图标
 
 仓库根目录的 `hook.py` 只是兼容旧版配置的转接文件（旧版 README 教大家在 settings.json 里直接调用它）；`claude-pet install` 会把旧的配置换成新的。
 
+### 发布新版本
+
+1. 修改 `claude_pet/__init__.py` 里的 `__version__`（唯一需要改的地方，`pyproject.toml` 会读取它）并提交。
+2. 打标签并推送：`git tag v0.2.0 && git push origin v0.2.0`。
+3. 到 GitHub 为该标签创建一个 **Release** 并写好说明。**用户更新前看到的，就是这段文字。** 草稿和预发布版会被忽略。
+4. 只需要做一次：把你的 GitHub `owner/repo` 填进 `claude_pet/update.py` 最上面的 `REPO`。在此之前，更新检查保持关闭。
 ### 文件
 
 | 文件 | 用途 |
@@ -189,6 +208,8 @@ claude-pet dev icon icon.ico          # 重新生成快捷方式用的图标
 | `claude_pet/screens.py` | 多屏幕支持：查询某个坐标所在屏幕的工作区 |
 | `claude_pet/hook.py` | 供 Claude Code hooks 调用：写入状态、必要时启动宠物（只用标准库，必须保持轻量） |
 | `claude_pet/installer.py` | `install`／`uninstall`／`doctor` |
+| `claude_pet/update.py` | 更新：检查 GitHub Releases、比较版本、一键更新（不涉及 Tk） |
+| `claude_pet/update_window.py` | 更新提醒（调度、气泡、菜单项）与更新内容窗口 |
 | `claude_pet/cli.py` | 命令行入口（`claude-pet`） |
 | `claude_pet/paths.py` | 文件位置（文件夹、端口）；环境变量 `CLAUDE_PET_HOME`、`CLAUDE_PET_PORT`、`CLAUDE_CONFIG_DIR` 可以覆盖，测试用 |
 

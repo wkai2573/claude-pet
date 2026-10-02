@@ -18,7 +18,7 @@ from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageTk
 
-from . import chat, i18n, paths, screens, settings
+from . import chat, i18n, paths, screens, settings, update_window
 from .i18n import t
 
 STATE = paths.STATE
@@ -974,6 +974,7 @@ class Pet:
         self.moved = False
         self.last_click = 0.0
         self.chat = chat.Chat(self, sys.modules[__name__])
+        self.update_mgr = update_window.UpdateManager(self, sys.modules[__name__])
 
         self.read_state()
         self.tick()
@@ -1052,7 +1053,10 @@ class Pet:
             dict(icon="😵", label=t("act.dizzy"), cb=lambda: self.demo("error", 2.6)),
             dict(icon="👋", label=t("act.wave"), cb=lambda: self.demo("attention", 3.5)),
         ]
-        items = [
+        new = self.update_mgr.pending()  # 有新版：選單最上面多一個「更新到 vX」
+        head = [dict(icon="⬆️", label=t("menu.update", version=new["version"]), cb=self.update_mgr.open_window),
+                dict(sep=True)] if new else []
+        items = head + [
             dict(section=t("section.chat")),
             dict(icon="💬", label=t("menu.chat"), cb=c.open),
             dict(icon="📊", label=t("menu.quota"), cb=c.show_quota),

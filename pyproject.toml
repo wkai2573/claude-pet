@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claude-pet"
-version = "0.1.0"
+dynamic = ["version"]  # 版本號只在 claude_pet/__init__.py 定義一處
 description = "A hand-drawn desktop pet for Windows that follows what Claude Code is doing, and lets you chat with Claude."
 readme = "README.md"
 license = "MIT"
@@ -29,3 +29,6 @@ Issues = "https://github.com/OWNER/claude-pet/issues"
 
 [tool.setuptools]
 packages = ["claude_pet"]
+
+[tool.setuptools.dynamic]
+version = { attr = "claude_pet.__version__" }

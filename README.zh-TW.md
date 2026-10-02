@@ -35,6 +35,7 @@ claude-pet install
 | `claude-pet` | 啟動小克（在背景執行，馬上回到命令列）。Claude Code 開始工作時，hooks 也會自動把它叫出來 |
 | `claude-pet stop` | 請小克結束（也可以右鍵選「關閉」） |
 | `claude-pet doctor` | 檢查環境，回報哪裡不對（Python、tkinter、Pillow、`claude` 指令、hooks 有沒有裝好） |
+| `claude-pet update` | 檢查有沒有新版本、顯示更新內容並更新（`--check` 只看不裝，`-y` 不再詢問） |
 | `claude-pet run` | 在前景執行；沒反應時用它看錯誤訊息 |
 
 同一時間只會有一隻：再啟動一次會直接結束。
@@ -49,6 +50,17 @@ pip uninstall claude-pet
 
 `uninstall` 只會移除 `install` 加進去的 hooks，其他設定不動，同樣會先備份。
 
+### 更新
+
+小克每天會在背景檢查一次 GitHub（沒網路就安靜略過）。有新版本時：
+
+- 小克會冒一顆泡泡，右鍵選單最上面多出一項「**更新到 vX.Y.Z**」；
+- 點下去會先顯示**更新內容**（Release 的說明），再讓你選「**立即更新**」「**稍後再說**」或「**跳過這個版本**」；
+- 「立即更新」會幫你做完剩下的事：小克先關掉、pip 升級 claude-pet、同步 hooks、小克再回來（會用泡泡告訴你成功了；如果中間出錯，會回到原本的版本，詳細記錄在 `%APPDATA%\claude-pet\update.log`）。
+
+習慣用命令列？`claude-pet update` 會先顯示更新內容、問你再安裝；`claude-pet update --check` 只看不裝。
+不想被提醒？在設定視窗把「**更新**」關掉（還是可以按「立即檢查」）。
+更新不需要裝 git。從原始碼資料夾執行（`pip install -e .`）的話不會自己更新，只會提醒你執行 `git pull`。
 ### 設定檔與資料放哪裡
 
 使用者資料放在 `%APPDATA%\claude-pet\`（`config.json`、`state.json`、`quota.json`、`icon.ico`），不放在程式旁邊，所以升級或重裝不會弄丟設定。
@@ -79,7 +91,7 @@ pip uninstall claude-pet
   - 小克：**動作 ▸**（摸摸、睡覺或叫醒、開心跳、思考、敲鍵盤、放大鏡、眩暈、招手）、**設定…**（開啟設定視窗）
   - 最後是「關閉」
   - 帶 ▸ 的列，游標停上去就像 Windows 選單一樣在右側飛出子選單（靠近螢幕右緣時改在左側）。
-- **設定視窗**：語言（English／繁體中文／简体中文，預設英文）、大小、自動出現、重設位置。
+- **設定視窗**：語言（English／繁體中文／简体中文，預設英文）、大小、自動出現、更新提醒、重設位置。
 - **可拖動**：拖到螢幕上任何位置（包含副螢幕），位置會記住。
 
 ## 跟小克聊天、選模型、看配額
@@ -112,6 +124,7 @@ pip uninstall claude-pet
 |---|---|---|
 | `scale` | 大小：`0.6` 小、`0.8` 中、`1.0` 大、`1.3` 特大（在設定視窗改） | `0.8` |
 | `lang` | 介面語言：`en` 英文、`zh` 繁體中文、`zh-CN` 簡體中文（在設定視窗改） | `en` |
+| `update_check` | 每天檢查一次 GitHub 有沒有新版本並提醒你（在設定視窗改） | `true` |
 | `x`、`y` | 視窗位置（拖動後自動記錄） | 主螢幕右下角 |
 | `disabled` | `true` 時 hook 不會在寵物沒開時自動叫出它（已經開著的仍會跟著動） | `false` |
 | `chat_model` | 對話用的模型 ID；`null` 為依 Claude Code 設定 | `null` |
@@ -177,6 +190,12 @@ claude-pet dev icon icon.ico          # 重新產生捷徑用的圖示
 
 專案根目錄的 `hook.py` 只是相容舊版設定的轉接檔（舊版 README 教大家在 settings.json 直接呼叫它）；`claude-pet install` 會把舊的設定換成新的。
 
+### 發佈新版本
+
+1. 把 `claude_pet/__init__.py` 的 `__version__` 加上去（唯一要改的地方，`pyproject.toml` 會讀它）並 commit。
+2. 打標籤並推上去：`git tag v0.2.0 && git push origin v0.2.0`。
+3. 到 GitHub 為那個標籤建立一個 **Release** 並寫好說明。**使用者更新前看到的，就是這段文字。** 草稿與預先發行版會被忽略。
+4. 只要做一次：把你的 GitHub `owner/repo` 填進 `claude_pet/update.py` 最上面的 `REPO`。在那之前，更新檢查會維持關閉。
 ### 檔案
 
 | 檔案 | 用途 |
@@ -189,6 +208,8 @@ claude-pet dev icon icon.ico          # 重新產生捷徑用的圖示
 | `claude_pet/screens.py` | 多螢幕：查詢座標所在螢幕的工作區 |
 | `claude_pet/hook.py` | 給 Claude Code hooks 呼叫：寫入狀態、必要時啟動寵物（只用標準函式庫，要很輕） |
 | `claude_pet/installer.py` | `install`／`uninstall`／`doctor` |
+| `claude_pet/update.py` | 更新：檢查 GitHub Releases、比對版本、一鍵更新（不碰 Tk） |
+| `claude_pet/update_window.py` | 更新提醒（排程、泡泡、選單項目）與更新內容視窗 |
 | `claude_pet/cli.py` | 命令列入口（`claude-pet`） |
 | `claude_pet/paths.py` | 檔案位置（資料夾、埠）；環境變數 `CLAUDE_PET_HOME`、`CLAUDE_PET_PORT`、`CLAUDE_CONFIG_DIR` 可以覆寫，測試用 |
 
