@@ -25,6 +25,7 @@ from tkinter import filedialog
 
 from PIL import Image, ImageTk
 
+import screens
 from i18n import t
 from widgets import (card_frame, CREAM, PAPER, SHADOW_C, HATCH_C, SOFT_LINE, INKP, DIMP, TRACK, GOOD, WARN, BAD, YELLOW, PILL, PILL_HOVER, ACCENT_P, ACCENT_HOVER, STOP_P, MIN_W, MIN_H, PAD, SHM, TITLE_H, hexc, photo, Pill, Scroll, render_face)
 
@@ -545,18 +546,25 @@ class ChatWindow:
     def place_near_pet(self):
         root = self.chat.pet.root
         cfg = self.chat.cfg
-        sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
-        if "chat_x" in cfg and "chat_y" in cfg:
+        pet_area = screens.area_for(root, root.winfo_x() + root.winfo_width() // 2, root.winfo_y() + root.winfo_height() // 2)
+        saved = "chat_x" in cfg and "chat_y" in cfg
+        if saved:
             x, y = cfg["chat_x"], cfg["chat_y"]
-        else:
+            # 小克被拉到別的螢幕了：視窗不要留在原本那個螢幕，跟到小克旁邊
+            saved = screens.area_for(root, x + self.W // 2, y + self.H // 2) == pet_area
+        if not saved:
             x = root.winfo_x() - self.W - 10
-            if x < 0:
+            if x < pet_area[0]:
                 x = root.winfo_x() + root.winfo_width() + 10
             y = root.winfo_y() + root.winfo_height() - self.H
-        self.pos = (max(0, min(sw - self.W, x)), max(0, min(sh - self.H - 40, y)))
+        left, top, right, bottom = pet_area if not saved else screens.area_for(root, x + self.W // 2, y + self.H // 2)
+        self.pos = (max(left, min(right - self.W, x)), max(top, min(bottom - self.H, y)))
 
     # —— 視窗 ——
     def show(self):
+        if not self.visible():  # 收起來的視窗再打開時，如果小克搬了螢幕，就跟過去
+            self.place_near_pet()
+            self.win.geometry(f"+{self.pos[0]}+{self.pos[1]}")
         self.win.deiconify()
         self.win.lift()
         self.win.attributes("-topmost", True)

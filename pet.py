@@ -22,6 +22,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFont, ImageTk
 
 import chat
 import i18n
+import screens
 import settings
 from i18n import t
 
@@ -758,10 +759,13 @@ class CardMenu(FloatWindow):
         self.child, self.child_row, self.timer = None, -1, None
         self.rows, h = menu_layout(items, header=parent is None)
         self.size = (MENU_W, h)
-        sw, sh = pet.root.winfo_screenwidth(), pet.root.winfo_screenheight()
-        self.px = max(0, min(sw - MENU_W - 2, x))
-        self.py = y if (parent or y + h < sh - 4) else y - h
-        self.move(self.px, max(0, min(self.py, sh - h - 4)), *self.size)
+        # 以游標（子選單則以母選單）所在的螢幕為準：副螢幕上的選單要留在副螢幕
+        self.area = parent.area if parent else screens.area_for(pet.root, x, y)
+        left, top, right, bottom = self.area
+        self.px = max(left, min(right - MENU_W - 2, x))
+        self.py = y if (parent or y + h < bottom - 4) else y - h
+        self.py = max(top, min(self.py, bottom - h - 4))
+        self.move(self.px, self.py, *self.size)
         c = self.canvas
         c.bind("<Motion>", lambda e: self.set_hover(self.row_at(e.y)))
         c.bind("<Leave>", lambda e: self.set_hover(-1))
@@ -834,9 +838,8 @@ class CardMenu(FloatWindow):
         self.timer = None
         self.close_child()
         kind, it, ry, rh, _ = self.rows[i]
-        sw = self.pet.root.winfo_screenwidth()
         x = self.px + MENU_W - 12
-        if x + MENU_W > sw - 2:
+        if x + MENU_W > self.area[2] - 2:  # 右邊放不下（螢幕右緣）就改在左邊
             x = self.px - MENU_W + 12
         self.child = CardMenu(self.pet, it["children"], x, self.py + ry - TOP_PAD, parent=self)
         self.child_row = i
@@ -981,11 +984,14 @@ class Pet:
         self.place()
 
     def place(self):
-        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        x = self.cfg.get("x", sw - self.width - 40)
-        y = self.cfg.get("y", sh - self.height - 60)
-        x = max(0, min(sw - self.width, x))
-        y = max(0, min(sh - self.height, y))
+        if "x" in self.cfg and "y" in self.cfg:
+            x, y = self.cfg["x"], self.cfg["y"]
+            left, top, right, bottom = screens.area_for(self.root, x + self.width // 2, y + self.height // 2)
+        else:  # 沒記過位置：主螢幕的右下角
+            left, top, right, bottom = screens.primary_area(self.root)
+            x, y = right - self.width - 40, bottom - self.height - 60
+        x = max(left, min(right - self.width, x))
+        y = max(top, min(bottom - self.height, y))
         self.root.geometry(f"{self.width}x{self.height}+{x}+{y}")
 
     def reset_pos(self):

@@ -7,6 +7,7 @@ import tkinter as tk
 
 from PIL import Image
 
+import screens
 from i18n import LANGS, get_lang, t
 from widgets import (ACCENT_HOVER, ACCENT_P, CREAM, DIMP, INKP, PAD, PILL, PILL_HOVER, SHM, SOFT_LINE, TITLE_H,
                      Pill, card_frame, hexc)
@@ -46,8 +47,9 @@ class SettingsWindow:
         w.attributes("-topmost", True)
         w.attributes("-transparentcolor", "#010101")
         w.configure(bg="#010101")
-        sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
-        self.pos = pos or ((sw - W) // 2, (sh - H) // 2)
+        left, top, right, bottom = screens.area_for(root, root.winfo_x() + root.winfo_width() // 2,
+                                                    root.winfo_y() + root.winfo_height() // 2)  # 小克所在的螢幕中央
+        self.pos = pos or (left + (right - left - W) // 2, top + (bottom - top - H) // 2)
         w.geometry(f"{W}x{H}+{self.pos[0]}+{self.pos[1]}")
         self.canvas = c = tk.Canvas(w, width=W, height=H, bg="#010101", highlightthickness=0, bd=0)
         c.pack()
