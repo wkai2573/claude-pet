@@ -16,7 +16,7 @@ You can also chat with it directly, pick the model and effort level, and check y
 
 ![Right-click menu: hover Model to switch models, hover Actions to make the pet do something](docs/menu.en.gif)
 
-**Chat with it directly** — it works like Claude Code in a small window: pick the model, effort and folder, see your 5-hour and weekly usage at the top, and approve tool requests right there. The pet reacts to what's happening.
+**Chat with it directly** — it works like Claude Code in a small window: pick the model, effort and folder, check your 5-hour and weekly usage (folded into one line, click to expand), and approve tool requests right there. The pet reacts to what's happening.
 
 ![Chat window: ask for a change, watch the tools run, approve a command, done](docs/chat.en.gif)
 
@@ -120,7 +120,7 @@ so your login, `CLAUDE.md`, project settings and available tools all behave as u
   The list has Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 4.5; a model your account can't use (for example one that needs extra credits) shows the CLI's error message as-is.
 - **Effort**: how hard Claude thinks (Low, Medium, High, Extra high, Max). The model button also shows it (for example `Sonnet 5.5 · High`); open it for **Model ▸** and **Effort ▸**, or use **Effort ▸** in the right-click menu. Low to Extra high apply right away mid-conversation; **Max** takes effect from the next new chat. "Default" follows your Claude Code settings. Models that don't support effort levels simply ignore it.
 - **Working folder**: the folder button in the window changes it; the default is your user folder. Changing it starts a new chat; "New chat" clears the current one.
-- **Usage**: the two bars at the top show your 5-hour and weekly usage with reset times, updated after every reply.
+- **Usage**: a one-line summary sits under the buttons (`▸ Usage  5-hour 37% · Weekly 18%`). Click it to unfold two bars with reset times; click again to fold. It's folded by default and remembers your choice. Updated after every reply; click the bars to refresh.
   Double-click the pet, or choose "Usage" in the menu, to get a bubble; if the data is more than 2 minutes old it refreshes first
   with a minimal call (about 800 tokens), which costs almost nothing. The result is cached in `quota.json`.
 - The status line under the messages shows "Thinking…", "Using PowerShell…" or "Waiting for approval…".
@@ -141,6 +141,7 @@ Lives in `%APPDATA%\claude-pet\config.json`. The pet maintains it automatically;
 | `disabled` | When `true`, the hook won't bring the pet up if it isn't running (an already running pet still follows along) | `false` |
 | `chat_model` | Model ID used for chat; `null` follows your Claude Code settings | `null` |
 | `chat_effort` | Effort level used for chat (`low`, `medium`, `high`, `xhigh`, `max`); `null` follows your Claude Code settings | `null` |
+| `chat_quota_open` | Whether the usage bars in the chat window are unfolded | `false` |
 | `chat_cwd` | Working folder for chat (changeable in the window) | your user folder |
 | `chat_x`, `chat_y`, `chat_size` | Chat window position and size (recorded when you drag or resize it) | next to the pet, 460×660 |
 | `claude_path` | Full path to the `claude` command, if it can't be found automatically | auto-detected |

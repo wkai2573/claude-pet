@@ -352,11 +352,42 @@ def tool_summary(name, inp):
 
 
 
-def render_quota(kit, w, q):
-    """兩條手繪風的配額條：標題、進度、百分比、重置時間。"""
-    pen = kit.Pen(w, 46, 3)
+QUOTA_HEAD_H, QUOTA_BARS_H = 20, 46  # 配額區：標題列（點一下收合／展開）與下面兩條配額條的高度
+
+
+def quota_color(q, key):
+    win = q.get(key)
+    if not win:
+        return DIMP
+    u = 1.0 if q.get("status") == "rejected" and key == "five_hour" else win["utilization"]
+    return GOOD if u < 0.6 else WARN if u < 0.85 else BAD
+
+
+def render_quota(kit, w, q, open_=True):
+    """配額區。收合時只有一行摘要（▸ 配額  5 小時 37% · 每週 18%）；展開時下面多兩條手繪風的配額條：標題、進度、百分比、重置時間。"""
+    h = QUOTA_HEAD_H + (QUOTA_BARS_H if open_ else 0)
+    pen = kit.Pen(w, h, 3)
+    cy = QUOTA_HEAD_H / 2
+    if open_:  # ▾
+        pen.poly([(1, cy - 2.5), (9, cy - 2.5), (5, cy + 3)], DIMP)
+    else:  # ▸
+        pen.poly([(2.5, cy - 4.5), (2.5, cy + 4.5), (8.5, cy)], DIMP)
+    kit.put_text(pen, 15, 1.5, t("menu.quota"), 11.5, INKP)
+    if not open_:
+        x = 15 + kit.text_width(t("menu.quota"), 11.5) + 14
+        for i, (title, key) in enumerate(((t("quota.five_hour"), "five_hour"), (t("quota.seven_day"), "seven_day"))):
+            win = q.get(key)
+            pct_txt = f"{round(win['utilization'] * 100)}%" if win else "？"
+            if i:
+                kit.put_text(pen, x, 1.5, "·", 11.5, DIMP)
+                x += kit.text_width("·", 11.5) + 8
+            kit.put_text(pen, x, 1.5, title, 11, DIMP)
+            x += kit.text_width(title, 11) + 5
+            kit.put_text(pen, x, 1.5, pct_txt, 11.5, quota_color(q, key))
+            x += kit.text_width(pct_txt, 11.5) + 8
+        return pen.im.resize((w, h), Image.LANCZOS)
     for i, (title, key) in enumerate(((t("quota.five_hour"), "five_hour"), (t("quota.seven_day"), "seven_day"))):
-        y = i * 23
+        y = QUOTA_HEAD_H + i * 23
         win = q.get(key)
         kit.put_text(pen, 0, y + 3, title, 11.5, INKP)
         pct_txt = f"{round(win['utilization'] * 100)}%" if win else "？"
@@ -374,7 +405,7 @@ def render_quota(kit, w, q):
                 pen.rrect(bx0, y + 6.5, fx, y + 15.5, 4.5, GOOD if u < 0.6 else WARN if u < 0.85 else BAD)
         kit.put_text(pen, bx1 + 8, y + 3, pct_txt, 11.5, INKP)
         kit.put_text(pen, w - rw, y + 3.5, left, 11, DIMP)
-    return pen.im.resize((w, 46), Image.LANCZOS)
+    return pen.im.resize((w, h), Image.LANCZOS)
 
 
 class ChatWindow:
@@ -417,9 +448,12 @@ class ChatWindow:
         self.i_new = c.create_window(0, 0, anchor="nw", window=self.new_chip)
 
         # 配額條（整張圖，點一下重新查）
+        self.quota_open = bool(cfg.get("chat_quota_open", False))  # 預設收合：配額不用一直看
         self.quota_item = c.create_image(0, 0, anchor="nw")
         self.quota_photo = None
-        c.tag_bind(self.quota_item, "<Button-1>", lambda e: chat.refresh_quota(True))
+        c.tag_bind(self.quota_item, "<Button-1>", self.on_quota_click)
+        c.tag_bind(self.quota_item, "<Enter>", lambda e: c.config(cursor="hand2"))
+        c.tag_bind(self.quota_item, "<Leave>", lambda e: c.config(cursor=""))
 
         # 對話內容
         self.msg_frame = tk.Frame(c, bg=paper)
@@ -492,8 +526,28 @@ class ChatWindow:
         card_h = 128 if self.pending else 0
         r["perm"] = (L, y - 4 - card_h, R, y - 4) if card_h else None
         top = (r["perm"][1] - 6) if card_h else y - 4
-        r["msg"] = (L, 4 + TITLE_H + 8 + 26 + 8 + 46 + 8, R, top)
+        r["msg"] = (L, 4 + TITLE_H + 8 + 26 + 8 + self.quota_h() + 8, R, top)
         return r
+
+    def quota_h(self):
+        return QUOTA_HEAD_H + (QUOTA_BARS_H if self.quota_open else 0)
+
+    def on_quota_click(self, e):
+        """點標題列：收合／展開；點下面的配額條：重新查一次。"""
+        qy = int(self.canvas.coords(self.quota_item)[1])
+        if e.y - qy < QUOTA_HEAD_H:
+            self.toggle_quota()
+        else:
+            self.chat.refresh_quota(True)
+
+    def toggle_quota(self):
+        self.quota_open = not self.quota_open
+        self.chat.cfg["chat_quota_open"] = self.quota_open
+        self.chat.pet.save_cfg()
+        self.quota_key = None
+        self.relayout()
+        if self.quota_open and time.time() - self.chat.quota.get("at", 0) > 600:
+            self.chat.refresh_quota()
 
     def request_layout(self):
         if self.layout_job is None:
@@ -522,10 +576,10 @@ class ChatWindow:
         put(self.i_new, R - self.new_chip.w, cy)
         qy = cy + 26 + 8
         put(self.quota_item, L, qy)
-        qkey = (R - L, json.dumps(self.chat.quota, sort_keys=True), int(time.time() // 60))
+        qkey = (R - L, self.quota_open, json.dumps(self.chat.quota, sort_keys=True), int(time.time() // 60))
         if qkey != self.quota_key:  # 配額沒變（也沒跨過一分鐘）就不重畫
             self.quota_key = qkey
-            self.quota_photo = photo(render_quota(kit, R - L, self.chat.quota), CREAM)
+            self.quota_photo = photo(render_quota(kit, R - L, self.chat.quota, self.quota_open), CREAM)
             c.itemconfigure(self.quota_item, image=self.quota_photo)
         mx0, my0, mx1, my1 = r["msg"]
         put(self.i_msg, mx0 + 6, my0 + 6, mx1 - mx0 - 12, my1 - my0 - 12)
