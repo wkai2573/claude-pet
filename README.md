@@ -6,7 +6,19 @@ A hand-drawn desktop pet for Windows that follows what [Claude Code](https://cla
 it thinks when you send a message, types along when Claude runs commands, and jumps for joy when a turn is done.
 You can also chat with it directly, pick the model, and check your usage quota.
 
+![Claude Pet demo: the pet thinks, types, searches, asks for attention and celebrates along with Claude Code](docs/hero.en.gif)
+
 > A personal hobby project, not affiliated with Anthropic. The character is fan art inspired by the "小克" (Xiǎo Kè) cartoon mascot popular in the community.
+
+## What it can do
+
+**Right-click menu** — chat, usage, switch the model, little actions, settings. Submenus fly out to the side, like the Windows menu.
+
+![Right-click menu: hover Model to switch models, hover Actions to make the pet do something](docs/menu.en.gif)
+
+**Chat with it directly** — it works like Claude Code in a small window: pick the model and the folder, see your 5-hour and weekly usage at the top, and approve tool requests right there. The pet reacts to what's happening.
+
+![Chat window: ask for a change, watch the tools run, approve a command, done](docs/chat.en.gif)
 
 ## Install
 
