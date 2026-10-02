@@ -1,0 +1,11 @@
+# 執行時產生或屬於個人偏好
+state.json
+config.json
+
+# Python
+__pycache__/
+*.pyc
+
+# 開發時輸出的預覽圖
+sheet*.png
+ui*.png
