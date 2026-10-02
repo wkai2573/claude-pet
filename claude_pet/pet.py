@@ -774,9 +774,9 @@ class CardMenu(FloatWindow):
         c.bind("<ButtonPress-3>", lambda e: self.root_menu().close())
         self.outside_since = None
         self.draw()
+        self.win.bind("<Escape>", lambda e: self.root_menu().close())  # 點過子選單後焦點在子選單上，所以每一層都要收 Esc
         if parent is None:
-            self.win.bind("<Escape>", lambda e: self.close())
-            self.win.bind("<FocusOut>", lambda e: self.close())
+            self.win.bind("<FocusOut>", lambda e: self.win.after(60, self.focus_lost))
             self.win.focus_force()
             self.win.after(250, self.watch)
 
@@ -873,6 +873,16 @@ class CardMenu(FloatWindow):
         except tk.TclError:
             return False
         return wx - 12 <= x <= wx + self.size[0] + 12 and wy - 12 <= y <= wy + self.size[1] + 12
+
+    def focus_lost(self):
+        """失去焦點就收起來；但游標還在這串選單上時不收：那是點子選單時焦點移到子選單，不是點到外面。
+        真的點到外面時游標不在選單上，照樣收；watch() 也會在游標離開太久時收尾。"""
+        try:
+            x, y = self.pet.root.winfo_pointerxy()
+            if not any(m.contains(x, y) for m in self.chain()):
+                self.close()
+        except tk.TclError:
+            pass
 
     def watch(self):
         """保險：游標離開整串選單超過 1.5 秒就自動收起（有些情況收不到失去焦點的通知）。"""
