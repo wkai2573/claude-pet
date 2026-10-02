@@ -22,10 +22,9 @@ classifiers = [
 [project.scripts]
 claude-pet = "claude_pet.cli:main"
 
-# TODO: 建好 GitHub 庫之後，把 OWNER 換成實際的帳號
 [project.urls]
-Homepage = "https://github.com/OWNER/claude-pet"
-Issues = "https://github.com/OWNER/claude-pet/issues"
+Homepage = "https://github.com/wkai2573/claude-pet"
+Issues = "https://github.com/wkai2573/claude-pet/issues"
 
 [tool.setuptools]
 packages = ["claude_pet"]

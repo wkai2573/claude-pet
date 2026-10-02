@@ -13,7 +13,7 @@ You can also chat with it directly, pick the model, and check your usage quota.
 You need: Windows 10/11, Python 3.9 or newer (with `tkinter`, which the python.org installer includes by default), and [Claude Code](https://claude.com/claude-code) installed and signed in.
 
 ```powershell
-pip install git+https://github.com/<owner>/claude-pet
+pip install git+https://github.com/wkai2573/claude-pet
 claude-pet install
 ```
 
@@ -25,7 +25,7 @@ claude-pet install
 
 After installing, **open a new Claude Code conversation** (or restart the current one) so the hooks take effect.
 
-> - pipx and uv work too: `pipx install git+https://github.com/<owner>/claude-pet` or `uv tool install git+https://github.com/<owner>/claude-pet`.
+> - pipx and uv work too: `pipx install git+https://github.com/wkai2573/claude-pet` or `uv tool install git+https://github.com/wkai2573/claude-pet`.
 > - If the `claude-pet` command isn't found (pip puts scripts in Python's `Scripts` folder, which may not be on your PATH), use `python -m claude_pet install` instead.
 > - Don't want the desktop shortcut: `claude-pet install --no-shortcut`. Want to see what it would write without changing anything: `claude-pet install --dry-run`.
 
@@ -171,7 +171,7 @@ Run `claude-pet doctor` first; it checks each item and tells you what's wrong.
 ## Development
 
 ```powershell
-git clone https://github.com/<owner>/claude-pet
+git clone https://github.com/wkai2573/claude-pet
 cd claude-pet
 pip install -e .          # editable install: code changes take effect immediately
 claude-pet doctor
@@ -193,7 +193,6 @@ The `hook.py` in the repository root is only a compatibility shim for the old se
 1. Bump `__version__` in `claude_pet/__init__.py` (the only place; `pyproject.toml` reads it) and commit.
 2. Tag and push: `git tag v0.2.0 && git push origin v0.2.0`.
 3. On GitHub, create a **Release** for that tag and write the notes. **That text is exactly what users read before they update.** Drafts and pre-releases are ignored.
-4. One-time setup: put your GitHub `owner/repo` in `REPO` at the top of `claude_pet/update.py`. Until then, update checking stays off.
 ### Files
 
 | File | Purpose |

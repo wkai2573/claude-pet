@@ -17,8 +17,7 @@ from pathlib import Path
 
 from . import __version__, paths
 
-# TODO: 建好 GitHub 庫之後，把 OWNER 換成實際的帳號；沒換之前，更新檢查會自動停用
-REPO = os.environ.get("CLAUDE_PET_REPO") or "OWNER/claude-pet"
+REPO = os.environ.get("CLAUDE_PET_REPO") or "wkai2573/claude-pet"
 API = os.environ.get("CLAUDE_PET_API") or "https://api.github.com"
 CHECK_EVERY = 20 * 3600  # 自動檢查的最短間隔（秒）：一天一次，離 GitHub 未登入的次數限制很遠
 STATE_FILE = paths.DATA / "update.json"
@@ -31,7 +30,7 @@ class UpdateError(Exception):
 
 
 def configured():
-    return not REPO.startswith("OWNER/")
+    return "/" in REPO and not REPO.startswith("OWNER/")
 
 
 # ───────────────────────── 版本比較 ─────────────────────────

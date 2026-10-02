@@ -12,7 +12,7 @@
 需要：Windows 10／11、Python 3.9 及以上（需要包含 `tkinter`，python.org 的安装程序默认就带）、已安装并登录的 Claude Code。
 
 ```powershell
-pip install git+https://github.com/<账号>/claude-pet
+pip install git+https://github.com/wkai2573/claude-pet
 claude-pet install
 ```
 
@@ -24,7 +24,7 @@ claude-pet install
 
 装好后，**新开一个 Claude Code 对话**（或重启当前对话），hooks 才会生效。
 
-> - 用 pipx 或 uv 安装也可以：`pipx install git+https://github.com/<账号>/claude-pet` 或 `uv tool install git+https://github.com/<账号>/claude-pet`。
+> - 用 pipx 或 uv 安装也可以：`pipx install git+https://github.com/wkai2573/claude-pet` 或 `uv tool install git+https://github.com/wkai2573/claude-pet`。
 > - 如果提示找不到 `claude-pet` 命令（pip 把命令放在 Python 的 `Scripts` 文件夹里，不一定在 PATH 中），改用 `python -m claude_pet install` 即可。
 > - 不想要桌面快捷方式：`claude-pet install --no-shortcut`。想先看看它会写入什么、但不真正修改：`claude-pet install --dry-run`。
 
@@ -173,7 +173,7 @@ pip uninstall claude-pet
 ## 开发
 
 ```powershell
-git clone https://github.com/<账号>/claude-pet
+git clone https://github.com/wkai2573/claude-pet
 cd claude-pet
 pip install -e .          # 可编辑安装：改代码立即生效
 claude-pet doctor
@@ -195,7 +195,6 @@ claude-pet dev icon icon.ico          # 重新生成快捷方式用的图标
 1. 修改 `claude_pet/__init__.py` 里的 `__version__`（唯一需要改的地方，`pyproject.toml` 会读取它）并提交。
 2. 打标签并推送：`git tag v0.2.0 && git push origin v0.2.0`。
 3. 到 GitHub 为该标签创建一个 **Release** 并写好说明。**用户更新前看到的，就是这段文字。** 草稿和预发布版会被忽略。
-4. 只需要做一次：把你的 GitHub `owner/repo` 填进 `claude_pet/update.py` 最上面的 `REPO`。在此之前，更新检查保持关闭。
 ### 文件
 
 | 文件 | 用途 |
